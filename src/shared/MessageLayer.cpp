@@ -1,0 +1,197 @@
+#include "MessageLayer.hpp"
+#include <cstring>
+extern "C" {
+#include <netinet/in.h>
+}
+
+// From GitHub, MIT licenced
+// SHA256 hashing function
+#include "picosha2.hpp"
+
+std::vector<uint8_t> MessageLayer::calculate_sha256_sum(void)
+{
+	// Where to put the checksum in the header
+	uint8_t *checksum = (uint8_t *)(&((header.data())[134]));
+	// Copy the header into a vector, to calculate the checksum from
+	uint8_t *header_ptr = header.data();
+	// (Everything up to the sha256 checksum field)
+	std::vector<uint8_t> checksum_vec(header_ptr, header_ptr + 134);
+	// Calculate the checksum...
+	std::vector<uint8_t> resultant_checksum(picosha2::k_digest_size);
+	picosha2::hash256(checksum_vec.begin(), checksum_vec.end(),
+			  resultant_checksum.begin(), resultant_checksum.end());
+	// Write it to the header
+	std::memcpy(checksum, resultant_checksum.data(),
+		    picosha2::k_digest_size);
+	// Return the checksum
+	return std::move(resultant_checksum);
+}
+
+// Verify the header's SHA256 checksum
+bool MessageLayer::verify_sha256_sum(void)
+{
+	// Retrieve the sha256sum from the header 134 bytes in
+	uint8_t *checksum = (uint8_t *)(&((header.data())[134]));
+	std::vector<uint8_t> checksum_vec(checksum, checksum + 32);
+	// Make sure the checksums match
+	return (checksum_vec == calculate_sha256_sum());
+}
+
+// Empty Constructor
+MessageLayer::MessageLayer(void)
+{
+}
+
+// Copy Constructor (with checksum verification)
+MessageLayer::MessageLayer(std::array<uint8_t, 166> &header_ref)
+{
+	// Copy over what's been passed.
+	header = header_ref;
+	// Make sure that the checksum is valid.
+	this->valid = verify_sha256_sum();
+}
+
+uint16_t MessageLayer::get_packet_number(void)
+{
+	// Retrieve the first 2 bytes from the header
+	// and convert them to host format and return
+	return ntohs(*((uint16_t *)&((header.data())[0])));
+}
+
+MessageLayer &MessageLayer::set_packet_number(uint16_t p_num)
+{
+	// Convert the passed short to network byte order,
+	// and assign it to its place in the header.
+	(*((uint16_t *)&((header.data())[0]))) = htons(p_num);
+	return (*this);
+}
+
+uint8_t MessageLayer::get_version_number(void)
+{
+	return (header.data())[2];
+}
+
+MessageLayer &MessageLayer::set_version_number(uint8_t v_num)
+{
+	// assign version number to its place in the header.
+	(header.data())[2] = v_num;
+	return (*this);
+}
+
+std::string MessageLayer::get_source_username(void)
+{
+	// Index into header to the start of the source username,
+	// and pull the correct number of bytes (up to 32)
+	char *username = (char *)(&((header.data())[3]));
+	std::string username_str = "";
+	for (uint8_t i = 0; i < 32; ++i) {
+		// While there are still characters to add, continue.
+		// Otherwise stop.
+		if (username[i] != '\0') {
+			username_str.push_back(username[i]);
+		} else {
+			break;
+		}
+	}
+	return std::move(username_str);
+}
+
+MessageLayer &MessageLayer::set_source_username(std::string source_username)
+{
+	// Copy passed string into the message header, and
+	// ensure that a null terminator is set, by setting one ourselves.
+	char *username = (char *)(&((header.data())[3]));
+	size_t min;
+	if (source_username.length() < 31)
+		min = source_username.length();
+	else
+		min = 31;
+	// Clear the entire username field of the header
+	std::memset(username, 0, 32);
+	// Put the source_username at the beginning of the
+	// field in the header.
+	std::memcpy(username, (source_username.c_str()), min);
+	// Put a null terminator at the end of the username.
+	username[min] = '\0';
+	return (*this);
+}
+
+std::string MessageLayer::get_dest_username(void)
+{
+	// Index into header to the start of the destination username,
+	// and pull the correct number of bytes (up to 32)
+	char *username = (char *)(&((header.data())[35]));
+	std::string username_str = "";
+	for (uint8_t i = 0; i < 32; ++i) {
+		// While there are still characters to add, continue.
+		// Otherwise stop.
+		if (username[i] != '\0') {
+			username_str.push_back(username[i]);
+		} else {
+			break;
+		}
+	}
+	return std::move(username_str);
+}
+
+MessageLayer &MessageLayer::set_dest_username(std::string source_username)
+{
+	// Copy passed string into the message header, and
+	// ensure that a null terminator is set, by setting one ourselves.
+	char *username = (char *)(&((header.data())[35]));
+	size_t min;
+	if (source_username.length() < 31)
+		min = source_username.length();
+	else
+		min = 31;
+	// Clear the entire username field of the header
+	std::memset(username, 0, 32);
+	// Put the source_username at the beginning of the
+	// field in the header.
+	std::memcpy(username, (source_username.c_str()), min);
+	// Put a null terminator at the end of the username.
+	username[min] = '\0';
+	return (*this);
+}
+
+uint8_t MessageLayer::get_message_type(void)
+{
+	// 67 bytes into the header is our message type
+	return (header.data())[67];
+}
+
+MessageLayer &MessageLayer::set_message_type(uint8_t m_type)
+{
+	// assign message type to its place in the header.
+	(header.data())[67] = m_type;
+	return (*this);
+}
+
+uint16_t MessageLayer::get_data_packet_length(void)
+{
+	// Retrieve the data packet length from the header
+	// Which is 2 bytes, 68 bytes into the header,
+	// and convert them to host format and return
+	return ntohs(*((uint16_t *)&((header.data())[68])));
+}
+
+MessageLayer &MessageLayer::set_data_packet_length(uint16_t data_packet_len)
+{
+	// Convert the passed short to network byte order,
+	// and assign it to its place in the header.
+	(*((uint16_t *)&((header.data())[68]))) = htons(data_packet_len);
+	return (*this);
+}
+
+std::array<uint8_t, 166> &MessageLayer::build()
+{
+	calculate_sha256_sum();
+	return header;
+}
+
+std::array<uint8_t, 166> MessageLayer::build_cpy()
+{
+	calculate_sha256_sum();
+	std::array<uint8_t, 166> cpy = header;
+	return std::move(cpy);
+}
