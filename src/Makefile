@@ -1,5 +1,5 @@
 CC=g++
-CPPFLAGS=-O2 -std=c++11 -I./shared
+CPPFLAGS=-O2 -g -std=c++11 -I./shared
 # Headers
 DEPS = ./shared/MessageLayer.hpp ./shared/picosha2.hpp
 # Object files
