@@ -1,0 +1,1 @@
+https://pubs.opengroup.org/onlinepubs/007908775/xsh/pthread_rwlock_init.html
