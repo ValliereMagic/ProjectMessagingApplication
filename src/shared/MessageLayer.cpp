@@ -10,18 +10,15 @@ extern "C" {
 
 std::vector<uint8_t> MessageLayer::calculate_sha256_sum(void)
 {
-	// Where to put the checksum in the header
-	uint8_t *checksum = &(header[134]);
 	// Copy the header into a vector, to calculate the checksum from
-	uint8_t *header_ptr = &(header[0]);
 	// (Everything up to the sha256 checksum field)
-	std::vector<uint8_t> checksum_vec(header_ptr, header_ptr + 134);
+	std::vector<uint8_t> checksum_vec(&(header[134]), &(header[165]));
 	// Calculate the checksum...
 	std::vector<uint8_t> resultant_checksum(picosha2::k_digest_size);
 	picosha2::hash256(checksum_vec.begin(), checksum_vec.end(),
 			  resultant_checksum.begin(), resultant_checksum.end());
 	// Write it to the header
-	std::memcpy(checksum, &(resultant_checksum[0]),
+	std::memcpy(&(header[134]), &(resultant_checksum[0]),
 		    picosha2::k_digest_size);
 	// Return the checksum
 	return std::move(resultant_checksum);
@@ -31,8 +28,7 @@ std::vector<uint8_t> MessageLayer::calculate_sha256_sum(void)
 bool MessageLayer::verify_sha256_sum(void)
 {
 	// Retrieve the sha256sum from the header 134 bytes in
-	uint8_t *checksum = &(header[134]);
-	std::vector<uint8_t> checksum_vec(checksum, checksum + 32);
+	std::vector<uint8_t> checksum_vec(&(header[134]), &(header[165]));
 	// Make sure the checksums match
 	return (checksum_vec == calculate_sha256_sum());
 }
