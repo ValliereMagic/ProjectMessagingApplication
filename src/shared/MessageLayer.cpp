@@ -3,7 +3,6 @@
 extern "C" {
 #include <netinet/in.h>
 }
-#include <iostream>
 
 // From GitHub, MIT licenced
 // SHA256 hashing function
