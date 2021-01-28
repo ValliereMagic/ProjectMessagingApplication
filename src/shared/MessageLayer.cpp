@@ -3,6 +3,7 @@
 extern "C" {
 #include <netinet/in.h>
 }
+#include <iostream>
 
 // From GitHub, MIT licenced
 // SHA256 hashing function
@@ -12,10 +13,11 @@ std::vector<uint8_t> MessageLayer::calculate_sha256_sum(void)
 {
 	// Copy the header into a vector, to calculate the checksum from
 	// (Everything up to the sha256 checksum field)
-	std::vector<uint8_t> checksum_vec(&(header[134]), &(header[165]));
+	// This constructor is not inclusive on the end byte. hence 134.
+	std::vector<uint8_t> data_to_sum(&(header[0]), &(header[134]));
 	// Calculate the checksum...
 	std::vector<uint8_t> resultant_checksum(picosha2::k_digest_size);
-	picosha2::hash256(checksum_vec.begin(), checksum_vec.end(),
+	picosha2::hash256(data_to_sum.begin(), data_to_sum.end(),
 			  resultant_checksum.begin(), resultant_checksum.end());
 	// Write it to the header
 	std::memcpy(&(header[134]), &(resultant_checksum[0]),
@@ -28,7 +30,8 @@ std::vector<uint8_t> MessageLayer::calculate_sha256_sum(void)
 bool MessageLayer::verify_sha256_sum(void)
 {
 	// Retrieve the sha256sum from the header 134 bytes in
-	std::vector<uint8_t> checksum_vec(&(header[134]), &(header[165]));
+	// This constructor is not inclusive on the end byte. hence 166.
+	std::vector<uint8_t> checksum_vec(&(header[134]), &(header[166]));
 	// Make sure the checksums match
 	return (checksum_vec == calculate_sha256_sum());
 }
@@ -36,6 +39,7 @@ bool MessageLayer::verify_sha256_sum(void)
 // Empty Constructor
 MessageLayer::MessageLayer(void)
 {
+	header.fill(0);
 }
 
 // Copy Constructor (with checksum verification)
