@@ -1,16 +1,18 @@
 CC=g++
 CPPFLAGS=-std=c++11 -O2 -I./shared
+ServerCPPFLAGS = $(CPPFLAGS) -lpthread
 # Headers
 DEPS = ./shared/MessageLayer.hpp ./shared/picosha2.hpp
 # Object files
 MessageLayerTests = ./shared/MessageLayerTests.o \
 					./shared/MessageLayer.o
 
-MessageLayerServer = ./shared/MessageLayer.o \
-					 ./server/Server.o
+MessageServer = ./shared/MessageLayer.o \
+					 ./server/Server.o \
+					 ./server/MessagingClient.o
 
 .PHONY : all
-all : MessageLayerTests MessageLayerServer
+all : MessageLayerTests MessageServer
 
 %.o: %.cpp $(DEPS)
 	$(CC) -c -o $@ $< $(CPPFLAGS)
@@ -18,8 +20,8 @@ all : MessageLayerTests MessageLayerServer
 MessageLayerTests: $(MessageLayerTests)
 	$(CC) -o $@ $^ $(CPPFLAGS)
 
-MessageLayerServer: $(MessageLayerServer)
-	$(CC) -o $@ $^ $(CPPFLAGS)
+MessageServer: $(MessageServer)
+	$(CC) -o $@ $^ $(ServerCPPFLAGS)
 
 clean:
-	$(RM) $(MessageLayerTests) $(MessageLayerServer) ./MessageLayerServer ./MessageLayerTests
+	$(RM) $(MessageLayerTests) $(MessageServer) ./MessageServer ./MessageLayerTests
