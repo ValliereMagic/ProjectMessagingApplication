@@ -4,10 +4,12 @@
 #include <vector>
 #include <memory>
 
+using MessageHeader = std::array<uint8_t, 166>;
+
 class MessageLayer {
 	// Message header for communications between the client and server.
 	// 166 bytes
-	std::array<uint8_t, 166> header;
+	MessageHeader header;
 
 	// Using the current contents of the header,
 	// Calculate the the header's checksum.
@@ -22,7 +24,8 @@ class MessageLayer {
 	bool valid = true;
 
 	MessageLayer(void);
-	MessageLayer(std::array<uint8_t, 166> &header_ref);
+	MessageLayer(MessageHeader &header_ref);
+	MessageLayer(MessageHeader &&header_rvalue_ref);
 
 	uint16_t get_packet_number(void);
 	MessageLayer &set_packet_number(uint16_t p_num);
@@ -44,6 +47,6 @@ class MessageLayer {
 
 	// Additional stuff to be added for future use here
 
-	std::array<uint8_t, 166> &build();
-	std::array<uint8_t, 166> build_cpy();
+	MessageHeader &build();
+	MessageHeader build_cpy();
 };

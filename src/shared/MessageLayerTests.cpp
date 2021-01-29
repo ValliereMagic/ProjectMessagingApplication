@@ -5,13 +5,13 @@
 int main(void)
 {
 	MessageLayer header_1;
-	auto &header = header_1.set_packet_number(1)
-			       .set_version_number(1)
-			       .set_source_username("BananaSoup")
-			       .set_dest_username("Blargato_Man")
-			       .set_message_type(4)
-			       .set_data_packet_length(26)
-			       .build();
+	MessageHeader &header = header_1.set_packet_number(1)
+					.set_version_number(1)
+					.set_source_username("BananaSoup")
+					.set_dest_username("Blargato_Man")
+					.set_message_type(4)
+					.set_data_packet_length(26)
+					.build();
 	// Make sure the header was set correctly
 	assert(header_1.get_packet_number() == 1);
 	assert(header_1.get_version_number() == 1);
@@ -22,4 +22,9 @@ int main(void)
 	// Make sure the header verifies on copy constructor
 	MessageLayer header_2(header);
 	assert(header_2.valid);
+	assert(header_1.valid);
+	// Move and verify
+	MessageLayer header_3(std::move(header));
+	// 'header' variable is now invalid.
+	assert(header_3.valid);
 }

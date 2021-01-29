@@ -1,4 +1,4 @@
 *.o
 .vscode/
 src/MessageLayerTests
-src/MessageLayerServer
+src/MessageServer
