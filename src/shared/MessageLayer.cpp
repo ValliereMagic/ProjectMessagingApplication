@@ -1,8 +1,10 @@
-#include "MessageLayer.hpp"
+#include <cstdint>
+#include <memory>
 #include <cstring>
 extern "C" {
 #include <netinet/in.h>
 }
+#include "MessageLayer.hpp"
 
 // From GitHub, MIT licenced
 // SHA256 hashing function

@@ -1,5 +1,3 @@
-#include "MessageLayer.hpp"
-#include "MessagingClient.hpp"
 #include <iostream>
 #include <thread>
 #include <csignal>
@@ -11,6 +9,7 @@ extern "C" {
 #include <arpa/inet.h>
 #include <pthread.h>
 }
+#include "MessagingClient.hpp"
 
 // Live threads of execution. Joined on exit
 static std::vector<std::thread> client_threads;

@@ -1,6 +1,5 @@
 #pragma once
 #include "MessageLayer.hpp"
-#include <string>
 
 class MessagingClient {
 	// MessageHeader Version
