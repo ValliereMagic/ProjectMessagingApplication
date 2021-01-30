@@ -73,7 +73,13 @@ static void login_procedure(int client_socket)
 	MessageHeader header;
 	header.fill(0);
 	// Read in what is supposed to be a login request...
-	read(client_socket, header.data(), header.size());
+	if (read(client_socket, header.data(), header.size()) <
+	    (ssize_t)(header.size())) {
+		std::cerr << "Initial Client header is too short; or error."
+			  << std::endl;
+		close(client_socket);
+		return;
+	}
 	// Pass the header to the message layer
 	MessageLayer ml(std::move(header));
 	// variable 'header' no longer valid after move.

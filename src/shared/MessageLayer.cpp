@@ -24,7 +24,7 @@ std::vector<uint8_t> MessageLayer::calculate_sha256_sum(void)
 	std::memcpy(&(header[134]), &(resultant_checksum[0]),
 		    picosha2::k_digest_size);
 	// Return the checksum
-	return std::move(resultant_checksum);
+	return resultant_checksum;
 }
 
 // Verify the header's SHA256 checksum
@@ -186,7 +186,7 @@ MessageHeader MessageLayer::build_cpy(void)
 {
 	calculate_sha256_sum();
 	MessageHeader cpy = header;
-	return std::move(cpy);
+	return cpy;
 }
 
 // Function for extracting strings using a length and a pointer.
@@ -203,5 +203,5 @@ std::string build_string_safe(const char *str, size_t len)
 			break;
 		}
 	}
-	return std::move(username_str);
+	return username_str;
 }
