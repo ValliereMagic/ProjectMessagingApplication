@@ -12,6 +12,8 @@ extern "C" {
 }
 
 #define VERSION 1
+#define SERVER_ADDRESS "0.0.0.0"
+#define SERVER_PORT 34551
 
 // Live threads of execution. Joined on exit
 static std::vector<std::thread> client_threads;
@@ -19,6 +21,7 @@ static std::vector<std::thread> client_threads;
 
 // The client socket file descriptor. Global 
 static int client_socket_fd;
+
 
 void cleanup_on_exit(int signum)
 {
@@ -31,13 +34,12 @@ void cleanup_on_exit(int signum)
 	exit(signum);
 }
 
-// This method is run by the thread that will recieve messages from the server.
+// This function is run by the thread that will recieve messages from the server.
 // It will wait for a message to be recieved and then act upon it.
 void message_reciever()
 {
 	MessageHeader header;
-	while (true)
-	{
+	while (true) {
 		// Clear out the message header
 		header.fill(0);
 		// Wait for a new message from the server
@@ -84,7 +86,20 @@ void message_reciever()
 
 }
 
-// This method is used for the thread running the send portion of the client.
+
+// This function 
+void console_help()
+{
+	std::cout << "Help" << std::endl;
+    std::cout << "====" << std::endl;
+	std::cout << "help                            - this message" << std::endl;
+	std::cout << "message <username> : <message>  - send a message to username" << std::endl;
+	std::cout << "message all : <message>         - send a message to the room" << std::endl;
+	std::cout << "who                             - find out who is in the room" << std::endl;
+	std::cout << "exit                            - exit the room (and the program)" << std::endl;
+}
+
+// This function is used for the thread running the send portion of the client.
 // It will get input from the user and create a message from it to send to the
 // server. 
 void message_sender()
@@ -94,6 +109,7 @@ void message_sender()
 	std::cout << "What will your username be(31 Max):";
 	std::cin >> username;
 
+	// Create
 	MessageLayer header_1;
 	MessageHeader &header = header_1.set_packet_number(1)
 					.set_version_number(VERSION)
@@ -104,9 +120,9 @@ void message_sender()
 	// Send the message to the server. With no flags
 	send(client_socket_fd , (void *)(header.data()), header.size(), 0 );
 	
+
 	// Loop for user input
-	while (true)
-	{
+	while (true) {
 
 	}
 }
@@ -128,32 +144,13 @@ int main(void)
 		exit(EXIT_FAILURE);
 	}
     
-    // Set the socket options to allow bind to succeed even if there
-	// are still connections open on this address and port.
-	// (Important on restarts of the server daemon)
-	// Explained in depth here:
-	//     https://stackoverflow.com/questions/3229860/what-is-the-meaning-of-so-reuseaddr-setsockopt-option-linux
-	int opt = 1; // (true)
-	if (setsockopt(client_socket_fd, SOL_SOCKET,
-		       SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(int))) {
-		std::cerr
-			<< "Failed to modify the socket options of the client socket."
-			<< std::endl;
-		exit(EXIT_FAILURE);
-	} 
 
 	// Build our address
 	sockaddr_in address = { .sin_family = AF_INET,
-				.sin_port = htons(34551) };
+				.sin_port = htons(SERVER_PORT) };
 
-	if (inet_pton(AF_INET, "0.0.0.0", &(address.sin_addr)) <= 0) {
+	if (inet_pton(AF_INET, SERVER_ADDRESS , &(address.sin_addr)) <= 0) {
 		std::cerr << "Error building IPV4 Address." << std::endl;
-		exit(EXIT_FAILURE);
-	}
-	// Attach our socket to our address
-	if (bind(client_socket_fd, (sockaddr *)&address, sizeof(sockaddr_in)) <
-	    0) {
-		std::cerr << "Error binding client to address." << std::endl;
 		exit(EXIT_FAILURE);
 	}
 
