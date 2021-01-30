@@ -1,8 +1,7 @@
 #pragma once
-#include <cstdint>
-#include <string>
 #include <vector>
-#include <memory>
+#include <string>
+#include <array>
 
 using MessageHeader = std::array<uint8_t, 166>;
 
