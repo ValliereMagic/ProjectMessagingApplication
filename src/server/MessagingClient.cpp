@@ -1,14 +1,16 @@
 #include "Server.hpp"
 #include <iostream>
 
-MessagingClient::MessagingClient(int client_socket, std::string &our_username)
-	: client_socket(client_socket), our_username(our_username)
+MessagingClient::MessagingClient(int client_socket, std::string &our_username,
+				 MessageLayer &&ml)
+	: client_socket(client_socket), our_username(our_username),
+	  ml(std::move(ml))
 {
 }
 
 MessagingClient::MessagingClient(MessagingClient &&client)
 	: client_socket(client.client_socket),
-	  our_username(std::move(client.our_username))
+	  our_username(std::move(client.our_username)), ml(std::move(client.ml))
 {
 }
 

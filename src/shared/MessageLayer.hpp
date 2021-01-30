@@ -24,6 +24,7 @@ class MessageLayer {
 	bool valid = true;
 
 	MessageLayer(void);
+	MessageLayer(MessageLayer &&ml);
 	MessageLayer(MessageHeader &header_ref);
 	MessageLayer(MessageHeader &&header_rvalue_ref);
 

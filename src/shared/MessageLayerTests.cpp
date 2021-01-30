@@ -27,4 +27,9 @@ int main(void)
 	MessageLayer header_3(std::move(header));
 	// 'header' variable is now invalid.
 	assert(header_3.valid);
+	// Try move constructor of the entire MessageLayer, and
+	// do a recalculation to make sure its valid.
+	MessageLayer header_4(std::move(header_3));
+	header_4.build();
+	assert(header_4.valid);
 }

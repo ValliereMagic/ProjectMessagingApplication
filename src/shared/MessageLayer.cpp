@@ -41,6 +41,12 @@ MessageLayer::MessageLayer(void)
 	header.fill(0);
 }
 
+// Move constructor
+MessageLayer::MessageLayer(MessageLayer &&ml)
+	: header(std::move(ml.header)), valid(ml.valid)
+{
+}
+
 // Copy Constructor (with checksum verification)
 MessageLayer::MessageLayer(MessageHeader &header_ref)
 {
@@ -50,7 +56,7 @@ MessageLayer::MessageLayer(MessageHeader &header_ref)
 	this->valid = verify_sha256_sum();
 }
 
-// Move constructor
+// Move constructor (with header)
 MessageLayer::MessageLayer(MessageHeader &&header_rvalue_ref)
 	: header(std::move(header_rvalue_ref))
 {
