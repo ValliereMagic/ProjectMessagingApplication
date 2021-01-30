@@ -1,6 +1,6 @@
-#include "MessageLayer.hpp"
 #include <cassert>
 #include <iostream>
+#include "MessageLayer.hpp"
 
 int main(void)
 {
