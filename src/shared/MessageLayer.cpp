@@ -41,12 +41,25 @@ MessageLayer::MessageLayer(void)
 	header.fill(0);
 }
 
+// Move constructor
+MessageLayer::MessageLayer(MessageLayer &&ml)
+	: header(std::move(ml.header)), valid(ml.valid)
+{
+}
+
 // Copy Constructor (with checksum verification)
-MessageLayer::MessageLayer(std::array<uint8_t, 166> &header_ref)
+MessageLayer::MessageLayer(MessageHeader &header_ref)
 {
 	// Copy over what's been passed.
 	header = header_ref;
 	// Make sure that the checksum is valid.
+	this->valid = verify_sha256_sum();
+}
+
+// Move constructor (with header)
+MessageLayer::MessageLayer(MessageHeader &&header_rvalue_ref)
+	: header(std::move(header_rvalue_ref))
+{
 	this->valid = verify_sha256_sum();
 }
 
@@ -182,15 +195,15 @@ MessageLayer &MessageLayer::set_data_packet_length(uint16_t data_packet_len)
 	return (*this);
 }
 
-std::array<uint8_t, 166> &MessageLayer::build()
+MessageHeader &MessageLayer::build(void)
 {
 	calculate_sha256_sum();
 	return header;
 }
 
-std::array<uint8_t, 166> MessageLayer::build_cpy()
+MessageHeader MessageLayer::build_cpy(void)
 {
 	calculate_sha256_sum();
-	std::array<uint8_t, 166> cpy = header;
+	MessageHeader cpy = header;
 	return std::move(cpy);
 }
