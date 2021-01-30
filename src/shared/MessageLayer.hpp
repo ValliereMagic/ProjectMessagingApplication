@@ -47,6 +47,6 @@ class MessageLayer {
 
 	// Additional stuff to be added for future use here
 
-	MessageHeader &build();
-	MessageHeader build_cpy();
+	MessageHeader &build(void);
+	MessageHeader build_cpy(void);
 };

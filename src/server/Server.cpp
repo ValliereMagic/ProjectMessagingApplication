@@ -19,6 +19,9 @@ static std::vector<std::thread> client_threads;
 // using posix rw_locks.
 static pthread_rwlock_t client_objects_lock;
 static std::unordered_map<std::string, MessagingClient> client_objects;
+// The server socket file descriptor. Global so that the cleanup signal
+// handler can close it.
+static int server_socket_fd;
 
 void cleanup_on_exit(int signum)
 {
@@ -28,13 +31,17 @@ void cleanup_on_exit(int signum)
 	}
 	// destroy the rwlock
 	pthread_rwlock_destroy(&client_objects_lock);
+	// Close the server socket
+	close(server_socket_fd);
 	exit(signum);
 }
 
-// Lookup client by username using the rwlock
+// Lookup client's fd by username using the rwlock
 // within client_objects
-MessagingClient &lookup_client(std::string &username)
+// -1 if the client doesn't exist!
+int lookup_client(std::string &username)
 {
+	int client_fd = -1;
 	// Open the lock for reading
 	if (pthread_rwlock_rdlock(&client_objects_lock) != 0) {
 		std::cerr << "Unable to lock the rwlock for reading."
@@ -42,7 +49,12 @@ MessagingClient &lookup_client(std::string &username)
 		exit(EXIT_FAILURE);
 	}
 
-	auto &client_ref = client_objects.at(username);
+	// Check if the user exists. If it does,
+	// return its socket fd. Otherwise, don't bother.
+	auto client_fd_it = client_objects.find(username);
+	if (client_fd_it != client_objects.end()) {
+		client_fd = (client_fd_it->second).get_client_socket();
+	}
 
 	// Close the lock for reading
 	if (pthread_rwlock_unlock(&client_objects_lock) != 0) {
@@ -51,7 +63,7 @@ MessagingClient &lookup_client(std::string &username)
 		exit(EXIT_FAILURE);
 	}
 
-	return client_ref;
+	return client_fd;
 }
 
 // Setup the login procedure, which requires a write to the
@@ -83,7 +95,8 @@ static void login_procedure(int client_socket)
 	// Create a MessagingClient, and insert it into the shared
 	// HashMap.
 	bool user_duplicate = false;
-	MessagingClient *client = nullptr;
+	MessagingClient *messaging_client = nullptr;
+
 	if (pthread_rwlock_wrlock(&client_objects_lock) != 0) {
 		std::cerr << "Unable to lock the rwlock for writing."
 			  << std::endl;
@@ -98,7 +111,7 @@ static void login_procedure(int client_socket)
 			username, MessagingClient(client_socket, username)));
 		// Cannot copy a client object. Only reference it and move it.
 		// It is owned by client_objects, and we are now borrowing it.
-		client = &(client_objects.at(username));
+		messaging_client = &(client_objects.at(username));
 	}
 
 	if (pthread_rwlock_unlock(&client_objects_lock) != 0) {
@@ -108,14 +121,14 @@ static void login_procedure(int client_socket)
 	}
 	// Make sure we didn't find a duplicate username while
 	// we were within the write lock:
-	if (client == nullptr || user_duplicate == true) {
+	if (messaging_client == nullptr || user_duplicate == true) {
 		std::cerr << "Client: " << username << " already exists."
 			  << std::endl;
 		close(client_socket);
 		return;
 	}
-	// This thread becomes the recv thread in MessagingClient.
-	client->recv();
+	// This thread becomes the client thread in MessagingClient.
+	messaging_client->client();
 	// When we return to here, it means we are done with the
 	// connection to this client.
 	if (pthread_rwlock_wrlock(&client_objects_lock) != 0) {
@@ -124,7 +137,6 @@ static void login_procedure(int client_socket)
 		exit(EXIT_FAILURE);
 	}
 	// Remove and destruct the object for this client.
-	// The destructor can block on joining the incoming_thread.
 	client_objects.erase(username);
 
 	if (pthread_rwlock_unlock(&client_objects_lock) != 0) {
@@ -145,9 +157,9 @@ int main(void)
 	// Server socket setup loosely followed from:
 	//     https://www.geeksforgeeks.org/socket-programming-cc/
 	// Build the socket to listen on
-	int server_socket = socket(AF_INET, SOCK_STREAM, 0);
+	server_socket_fd = socket(AF_INET, SOCK_STREAM, 0);
 	// Make sure socket descriptor initialization was successful.
-	if (server_socket == 0) {
+	if (server_socket_fd == 0) {
 		std::cerr << "Failed to Initialize server socket descriptor."
 			  << std::endl;
 		exit(EXIT_FAILURE);
@@ -158,8 +170,8 @@ int main(void)
 	// Explained in depth here:
 	//     https://stackoverflow.com/questions/3229860/what-is-the-meaning-of-so-reuseaddr-setsockopt-option-linux
 	int opt = 1; // (true)
-	if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT,
-		       &opt, sizeof(int))) {
+	if (setsockopt(server_socket_fd, SOL_SOCKET,
+		       SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(int))) {
 		std::cerr
 			<< "Failed to modify the socket options of the server socket."
 			<< std::endl;
@@ -174,13 +186,13 @@ int main(void)
 		exit(EXIT_FAILURE);
 	}
 	// Attach our socket to our address
-	if (bind(server_socket, (sockaddr *)&address, sizeof(sockaddr_in)) <
+	if (bind(server_socket_fd, (sockaddr *)&address, sizeof(sockaddr_in)) <
 	    0) {
 		std::cerr << "Error binding to address." << std::endl;
 		exit(EXIT_FAILURE);
 	}
 	// Set up listener for new connections
-	if (listen(server_socket, 5) < 0) {
+	if (listen(server_socket_fd, 5) < 0) {
 		std::cerr << "Error trying to listen for connections on socket."
 			  << std::endl;
 		exit(EXIT_FAILURE);
@@ -189,8 +201,8 @@ int main(void)
 	socklen_t addr_len = sizeof(sockaddr_in);
 	while (true) {
 		// Accept a client connection
-		int new_client_socket =
-			accept(server_socket, (sockaddr *)&address, &addr_len);
+		int new_client_socket = accept(server_socket_fd,
+					       (sockaddr *)&address, &addr_len);
 		// Make sure the client connection is valid
 		if (new_client_socket < 0) {
 			std::cerr
@@ -202,6 +214,5 @@ int main(void)
 		client_threads.push_back(std::move(
 			std::thread(login_procedure, new_client_socket)));
 	}
-	close(server_socket);
 	return 0;
 }
