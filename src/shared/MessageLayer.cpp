@@ -90,41 +90,40 @@ MessageLayer &MessageLayer::set_version_number(uint8_t v_num)
 	return (*this);
 }
 
-std::string MessageLayer::get_source_username(void)
+// Internal function for setting usernames within
+// the header
+void MessageLayer::set_username(const std::string &source_username,
+				char *header_ptr)
 {
-	// Index into header to the start of the source username,
-	// and pull the correct number of bytes (up to 32)
-	char *username = (char *)&(header[3]);
-	std::string username_str = "";
-	for (uint8_t i = 0; i < 32; ++i) {
-		// While there are still characters to add, continue.
-		// Otherwise stop.
-		if (username[i] != '\0') {
-			username_str.push_back(username[i]);
-		} else {
-			break;
-		}
-	}
-	return std::move(username_str);
-}
-
-MessageLayer &MessageLayer::set_source_username(std::string source_username)
-{
-	// Copy passed string into the message header, and
-	// ensure that a null terminator is set, by setting one ourselves.
-	char *username = (char *)&(header[3]);
 	size_t min;
 	if (source_username.length() < 31)
 		min = source_username.length();
 	else
 		min = 31;
 	// Clear the entire username field of the header
-	std::memset(username, 0, 32);
+	std::memset(header_ptr, 0, 32);
 	// Put the source_username at the beginning of the
 	// field in the header.
-	std::memcpy(username, (source_username.c_str()), min);
+	std::memcpy(header_ptr, (source_username.c_str()), min);
 	// Put a null terminator at the end of the username.
-	username[min] = '\0';
+	header_ptr[min] = '\0';
+}
+
+std::string MessageLayer::get_source_username(void)
+{
+	// Index into header to the start of the source username,
+	// and pull the correct number of bytes (up to 32)
+	char *username = (char *)&(header[3]);
+	return std::move(build_string_safe(username, 32));
+}
+
+MessageLayer &
+MessageLayer::set_source_username(const std::string &source_username)
+{
+	// Copy passed string into the message header, and
+	// ensure that a null terminator is set, by setting one ourselves.
+	char *username = (char *)&(header[3]);
+	this->set_username(source_username, username);
 	return (*this);
 }
 
@@ -133,36 +132,16 @@ std::string MessageLayer::get_dest_username(void)
 	// Index into header to the start of the destination username,
 	// and pull the correct number of bytes (up to 32)
 	char *username = (char *)&(header[35]);
-	std::string username_str = "";
-	for (uint8_t i = 0; i < 32; ++i) {
-		// While there are still characters to add, continue.
-		// Otherwise stop.
-		if (username[i] != '\0') {
-			username_str.push_back(username[i]);
-		} else {
-			break;
-		}
-	}
-	return std::move(username_str);
+	return std::move(build_string_safe(username, 32));
 }
 
-MessageLayer &MessageLayer::set_dest_username(std::string source_username)
+MessageLayer &
+MessageLayer::set_dest_username(const std::string &source_username)
 {
 	// Copy passed string into the message header, and
 	// ensure that a null terminator is set, by setting one ourselves.
 	char *username = (char *)&(header[35]);
-	size_t min;
-	if (source_username.length() < 31)
-		min = source_username.length();
-	else
-		min = 31;
-	// Clear the entire username field of the header
-	std::memset(username, 0, 32);
-	// Put the source_username at the beginning of the
-	// field in the header.
-	std::memcpy(username, (source_username.c_str()), min);
-	// Put a null terminator at the end of the username.
-	username[min] = '\0';
+	this->set_username(source_username, username);
 	return (*this);
 }
 
@@ -206,4 +185,21 @@ MessageHeader MessageLayer::build_cpy(void)
 	calculate_sha256_sum();
 	MessageHeader cpy = header;
 	return std::move(cpy);
+}
+
+// Function for extracting strings using a length and a pointer.
+// (Message data packets)
+std::string build_string_safe(const char *str, size_t len)
+{
+	std::string username_str = "";
+	for (uint8_t i = 0; i < len; ++i) {
+		// While there are still characters to add, continue.
+		// Otherwise stop.
+		if (str[i] != '\0') {
+			username_str.push_back(str[i]);
+		} else {
+			break;
+		}
+	}
+	return std::move(username_str);
 }
