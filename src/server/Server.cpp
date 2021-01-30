@@ -108,7 +108,9 @@ static void login_procedure(int client_socket)
 		user_duplicate = true;
 	} else {
 		client_objects.insert(std::make_pair(
-			username, MessagingClient(client_socket, username)));
+			username, MessagingClient(client_socket, username,
+						  std::move(ml))));
+		// variable 'ml' no longer valid after move.
 		// Cannot copy a client object. Only reference it and move it.
 		// It is owned by client_objects, and we are now borrowing it.
 		messaging_client = &(client_objects.at(username));

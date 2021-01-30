@@ -1,12 +1,15 @@
 #pragma once
+#include "MessageLayer.hpp"
 #include <string>
 
 class MessagingClient {
 	const int client_socket;
 	const std::string our_username;
+	MessageLayer ml;
 
     public:
-	MessagingClient(int client_socket, std::string &our_username);
+	MessagingClient(int client_socket, std::string &our_username,
+			MessageLayer &&ml);
 	MessagingClient(MessagingClient &&client);
 	// Handled by the thread that creates and runs this object on
 	// accept. Handles messages sent to the server from the client.
