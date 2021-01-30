@@ -116,7 +116,7 @@ std::string MessageLayer::get_source_username(void)
 	// Index into header to the start of the source username,
 	// and pull the correct number of bytes (up to 32)
 	char *username = (char *)&(header[3]);
-	return std::move(build_string_safe(username, 32));
+	return build_string_safe(username, 32);
 }
 
 MessageLayer &
@@ -134,7 +134,7 @@ std::string MessageLayer::get_dest_username(void)
 	// Index into header to the start of the destination username,
 	// and pull the correct number of bytes (up to 32)
 	char *username = (char *)&(header[35]);
-	return std::move(build_string_safe(username, 32));
+	return build_string_safe(username, 32);
 }
 
 MessageLayer &
