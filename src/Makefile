@@ -1,5 +1,5 @@
 CC=g++
-CPPFLAGS=-std=c++11 -O2 -I./shared
+CPPFLAGS= -Wall -Werror -std=c++11 -O2 -I./shared
 LINKFLAGS = $(CPPFLAGS) -lpthread
 # Headers
 DEPS = ./shared/MessageLayer.hpp ./shared/picosha2.hpp \
