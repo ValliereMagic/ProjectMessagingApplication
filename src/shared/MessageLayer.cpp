@@ -1,4 +1,6 @@
 #include "MessageLayer.hpp"
+#include <cstdint>
+#include <memory>
 #include <cstring>
 extern "C" {
 #include <netinet/in.h>

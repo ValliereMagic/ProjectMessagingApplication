@@ -79,6 +79,7 @@ void message_reciever()
 				break;
 			// Unsupported Message Type
 			default:
+				break;
 		}
 
 	}
