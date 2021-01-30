@@ -189,13 +189,13 @@ MessageLayer &MessageLayer::set_data_packet_length(uint16_t data_packet_len)
 	return (*this);
 }
 
-MessageHeader &MessageLayer::build()
+MessageHeader &MessageLayer::build(void)
 {
 	calculate_sha256_sum();
 	return header;
 }
 
-MessageHeader MessageLayer::build_cpy()
+MessageHeader MessageLayer::build_cpy(void)
 {
 	calculate_sha256_sum();
 	MessageHeader cpy = header;
