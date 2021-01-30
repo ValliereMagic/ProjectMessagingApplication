@@ -163,7 +163,7 @@ int main(void)
     }
 
 	// Create a thread to recieve
-	client_threads.push_back(std::move(std::thread(message_reciever)));
+	client_threads.push_back(std::thread(message_reciever));
 	// This one will be the sender
 	message_sender();
 }

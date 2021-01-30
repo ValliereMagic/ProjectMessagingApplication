@@ -218,8 +218,7 @@ int main(void)
 			exit(EXIT_FAILURE);
 		}
 		// Set up the client thread for this connection.
-		client_threads.push_back(std::move(
-			std::thread(login_procedure, new_client_socket)));
+		client_threads.push_back(std::thread(login_procedure, new_client_socket));
 	}
 	return 0;
 }
