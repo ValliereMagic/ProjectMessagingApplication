@@ -1,5 +1,3 @@
-#include "MessageLayer.hpp"
-#include "MessagingClient.hpp"
 #include <iostream>
 #include <thread>
 #include <csignal>
@@ -11,6 +9,7 @@ extern "C" {
 #include <arpa/inet.h>
 #include <pthread.h>
 }
+#include "MessagingClient.hpp"
 
 // Live threads of execution. Joined on exit
 static std::vector<std::thread> client_threads;
@@ -74,7 +73,13 @@ static void login_procedure(int client_socket)
 	MessageHeader header;
 	header.fill(0);
 	// Read in what is supposed to be a login request...
-	read(client_socket, header.data(), header.size());
+	if (read(client_socket, header.data(), header.size()) <
+	    (ssize_t)(header.size())) {
+		std::cerr << "Initial Client header is too short; or error."
+			  << std::endl;
+		close(client_socket);
+		return;
+	}
 	// Pass the header to the message layer
 	MessageLayer ml(std::move(header));
 	// variable 'header' no longer valid after move.
@@ -213,8 +218,7 @@ int main(void)
 			exit(EXIT_FAILURE);
 		}
 		// Set up the client thread for this connection.
-		client_threads.push_back(std::move(
-			std::thread(login_procedure, new_client_socket)));
+		client_threads.push_back(std::thread(login_procedure, new_client_socket));
 	}
 	return 0;
 }

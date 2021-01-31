@@ -1,27 +1,35 @@
 CC=g++
-CPPFLAGS=-std=c++11 -O2 -I./shared
-ServerCPPFLAGS = $(CPPFLAGS) -lpthread
+CPPFLAGS= -Wall -std=c++11 -O2 -I./shared 
+LINKFLAGS = -lpthread -z muldefs
 # Headers
-DEPS = ./shared/MessageLayer.hpp ./shared/picosha2.hpp
+DEPS = ./shared/MessageLayer.hpp ./shared/picosha2.hpp \
+	   ./server/MessagingClient.hpp ./server/Server.hpp
 # Object files
-MessageLayerTests = ./shared/MessageLayerTests.o \
-					./shared/MessageLayer.o
+MessageLayerTests = ./shared/MessageLayer.o \
+					./shared/MessageLayerTests.o
 
 MessageServer = ./shared/MessageLayer.o \
-					 ./server/Server.o \
-					 ./server/MessagingClient.o
+				./server/Server.o \
+				./server/MessagingClient.o
+
+MessageClient = ./shared/MessageLayer.o \
+				./client/Client.o
 
 .PHONY : all
-all : MessageLayerTests MessageServer
+all : MessageLayerTests MessageServer MessageClient
 
 %.o: %.cpp $(DEPS)
 	$(CC) -c -o $@ $< $(CPPFLAGS)
 
 MessageLayerTests: $(MessageLayerTests)
-	$(CC) -o $@ $^ $(CPPFLAGS)
+	$(CC) -o $@ $^
 
 MessageServer: $(MessageServer)
-	$(CC) -o $@ $^ $(ServerCPPFLAGS)
+	$(CC) -o $@ $^ $(LINKFLAGS)
+
+MessageClient: $(MessageClient)
+	$(CC) -o $@ $^ $(LINKFLAGS)
 
 clean:
-	$(RM) $(MessageLayerTests) $(MessageServer) ./MessageServer ./MessageLayerTests
+	$(RM) $(MessageLayerTests) $(MessageServer) $(MessageClient) ./MessageServer \
+		  ./MessageLayerTests ./MessageClient

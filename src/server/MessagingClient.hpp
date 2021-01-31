@@ -1,8 +1,9 @@
 #pragma once
 #include "MessageLayer.hpp"
-#include <string>
 
 class MessagingClient {
+	// MessageHeader Version
+	const int version = 1;
 	const int client_socket;
 	const std::string our_username;
 	MessageLayer ml;

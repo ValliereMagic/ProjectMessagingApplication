@@ -1,5 +1,6 @@
-#include "Server.hpp"
 #include <iostream>
+#include "Server.hpp"
+#include "MessagingClient.hpp"
 
 MessagingClient::MessagingClient(int client_socket, std::string &our_username,
 				 MessageLayer &&ml)

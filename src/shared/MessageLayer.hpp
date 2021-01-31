@@ -1,8 +1,7 @@
 #pragma once
-#include <cstdint>
-#include <string>
 #include <vector>
-#include <memory>
+#include <string>
+#include <array>
 
 using MessageHeader = std::array<uint8_t, 166>;
 
@@ -14,9 +13,12 @@ class MessageLayer {
 	// Using the current contents of the header,
 	// Calculate the the header's checksum.
 	std::vector<uint8_t> calculate_sha256_sum(void);
-
 	// Verify the header's SHA256 checksum
 	bool verify_sha256_sum(void);
+	// Internal function for setting usernames within
+	// the header
+	static inline void set_username(const std::string &source_username,
+					char *header_ptr);
 
     public:
 	// If this is false you probably shouldn't try to send this...
@@ -35,10 +37,10 @@ class MessageLayer {
 	MessageLayer &set_version_number(uint8_t v_num);
 
 	std::string get_source_username(void);
-	MessageLayer &set_source_username(std::string source_username);
+	MessageLayer &set_source_username(const std::string &source_username);
 
 	std::string get_dest_username(void);
-	MessageLayer &set_dest_username(std::string source_username);
+	MessageLayer &set_dest_username(const std::string &source_username);
 
 	uint8_t get_message_type(void);
 	MessageLayer &set_message_type(uint8_t m_type);
@@ -51,3 +53,7 @@ class MessageLayer {
 	MessageHeader &build(void);
 	MessageHeader build_cpy(void);
 };
+
+// Function for extracting strings using a length and a pointer.
+// (Message data packets)
+std::string build_string_safe(const char *str, size_t len);
