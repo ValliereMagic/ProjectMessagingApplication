@@ -1,6 +1,6 @@
 CC=g++
-CPPFLAGS= -Wall -Werror -std=c++11 -O2 -I./shared
-LINKFLAGS = $(CPPFLAGS) -lpthread
+CPPFLAGS= -Wall -std=c++11 -O2 -I./shared 
+LINKFLAGS = -lpthread -z muldefs
 # Headers
 DEPS = ./shared/MessageLayer.hpp ./shared/picosha2.hpp \
 	   ./server/MessagingClient.hpp ./server/Server.hpp
@@ -22,7 +22,7 @@ all : MessageLayerTests MessageServer MessageClient
 	$(CC) -c -o $@ $< $(CPPFLAGS)
 
 MessageLayerTests: $(MessageLayerTests)
-	$(CC) -o $@ $^ $(CPPFLAGS)
+	$(CC) -o $@ $^
 
 MessageServer: $(MessageServer)
 	$(CC) -o $@ $^ $(LINKFLAGS)

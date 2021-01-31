@@ -3,7 +3,7 @@
 
 class MessagingClient {
 	// MessageHeader Version
-	static constexpr int const &version = 1;
+	const int version = 1;
 	const int client_socket;
 	const std::string our_username;
 	MessageLayer ml;
