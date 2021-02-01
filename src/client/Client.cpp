@@ -27,6 +27,8 @@ static std::atomic<bool> is_running;
 // The client socket file descriptor. Global
 static int client_socket_fd;
 
+// This function is multipurposed. It is used by the sig handler to cleanup on ^c
+// It is also called when the program is closing normally.
 void cleanup_on_exit(int signum)
 {
 	// Join back the client thread
@@ -104,7 +106,7 @@ void message_receiver()
 		// Message Type - Error
 		case 1:
 			// Wait for a new message from the server
-			read_size = read(client_socket_fd, data_package.data(), data_package.size());
+			read_size = read(client_socket_fd, data_package.data(), data_package.capacity());
 			
 			// Check if other thread is still running
 			if (!is_running) {
@@ -135,7 +137,7 @@ void message_receiver()
 		// Message Type - Who
 		case 2:
 			// Wait for a new message from the server
-			read_size = read(client_socket_fd, data_package.data(), data_package.size());
+			read_size = read(client_socket_fd, data_package.data(), data_package.capacity());
 			
 			// Check if other thread is still running
 			if (!is_running) {
@@ -169,7 +171,7 @@ void message_receiver()
 		// Message Type - Message
 		case 4:
 			// Wait for a new message from the server
-			read_size = read(client_socket_fd, data_package.data(), data_package.size());
+			read_size = read(client_socket_fd, data_package.data(), data_package.capacity());
 			
 			// Check if other thread is still running
 			if (!is_running) {
@@ -246,19 +248,22 @@ void message_sender()
 	std::string recipient;
 	std::size_t position;
 	std::size_t position2;
+	std::size_t packet_number = 1;
 	// Get username from the user
 	std::cout << "What will your username be(31 Max):";
 	std::cin >> username;
 
 	// Create message header for login
 	MessageLayer header_1;
-	MessageHeader &header = header_1.set_packet_number(1)
+	MessageHeader &header = header_1.set_packet_number(packet_number+1)
 					.set_version_number(VERSION)
 					.set_source_username(username)
 					.set_message_type(0)
 					.set_data_packet_length(0)
 					.build();
 
+	// Update the packet number
+	packet_number++;
 	// Send the message to the server. With no flags. Check to make sure sent.
 	if (send(client_socket_fd, (void *)(header.data()), header.size(), 0) == -1) {
 		std::cerr << "Failure to send login through socket" << std::endl;
@@ -278,8 +283,6 @@ void message_sender()
 	
 	// Loop for user input
 	while (true) {
-		// Create a new MessageLayer each iteration
-		MessageLayer header_2;
 
 		// Get user input
 		std::cout << ">";
@@ -305,13 +308,16 @@ void message_sender()
 			// Check if its 'who'
 			if (input.compare(0, 3, "who") == 0) {
 				// Create a who packet
-				MessageHeader &header = header_2.set_packet_number(1)
+				MessageHeader &header = header_1.set_packet_number(packet_number)
 					.set_version_number(VERSION)
 					.set_source_username(username)
 					.set_source_username("server")
 					.set_message_type(2)
 					.set_data_packet_length(0)
 					.build();
+
+				// Update the packet number
+				packet_number++;
 
 				// Send the message to the server. With no flags. Check to make sure sent.
 				if (send(client_socket_fd, (void *)(header.data()), header.size(), 0) == -1) {
@@ -337,13 +343,16 @@ void message_sender()
 				// Kill itself
 				cleanup_on_exit(0);
 
-				MessageHeader &header = header_2.set_packet_number(1)
+				MessageHeader &header = header_1.set_packet_number(packet_number)
 					.set_version_number(VERSION)
 					.set_source_username(username)
 					.set_source_username("server")
 					.set_message_type(5)
 					.set_data_packet_length(0)
 					.build();
+				
+				// Update the packet number
+				packet_number++;
 
 				// Send the message to the server. With no flags. Check to make sure sent.
 				if (send(client_socket_fd, (void *)(header.data()), header.size(), 0) == -1) {
@@ -391,13 +400,16 @@ void message_sender()
 				message = input.substr(position2+1, std::string::npos);
 
 				// Create an all message
-				MessageHeader &header = header_2.set_packet_number(1)
+				MessageHeader &header = header_1.set_packet_number(packet_number)
 					.set_version_number(VERSION)
 					.set_source_username(username)
 					.set_source_username("all")
 					.set_message_type(5)
 					.set_data_packet_length(message.length()+1)
 					.build();
+				
+				// Update the packet number
+				packet_number++;
 
 				// Send the header to the server. With no flags. Check to make sure sent.
 				if (send(client_socket_fd, (void *)(header.data()), header.size(), 0) == -1) {
@@ -430,13 +442,16 @@ void message_sender()
 				message = input.substr(position2+1, std::string::npos);
 				
 				// Create an personal message
-				MessageHeader &header = header_2.set_packet_number(1)
+				MessageHeader &header = header_1.set_packet_number(packet_number)
 					.set_version_number(VERSION)
 					.set_source_username(username)
 					.set_source_username(recipient)
 					.set_message_type(5)
 					.set_data_packet_length(message.length()+1)
 					.build();
+				
+				// Update the packet number
+				packet_number++;
 
 				// Send the header to the server. With no flags. Check to make sure sent.
 				if (send(client_socket_fd, (void *)(header.data()), header.size(), 0) == -1) {
