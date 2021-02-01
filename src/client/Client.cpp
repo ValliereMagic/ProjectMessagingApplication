@@ -95,7 +95,7 @@ void message_receiver()
 		}
 
 		// Create a vector to hold the second data package if needed
-		std::vector<uint8_t> data_package(ml.get_data_packet_length()); 
+		std::vector<uint8_t> data_package (ml.get_data_packet_length()); 
 
 		// What type of message is it? And how to handle it.
 		switch (ml.get_message_type()) {
@@ -106,7 +106,7 @@ void message_receiver()
 		// Message Type - Error
 		case 1:
 			// Wait for a new message from the server
-			read_size = read(client_socket_fd, data_package.data(), data_package.capacity());
+			read_size = read(client_socket_fd, data_package.data(), data_package.size());
 			
 			// Check if other thread is still running
 			if (!is_running) {
@@ -137,7 +137,7 @@ void message_receiver()
 		// Message Type - Who
 		case 2:
 			// Wait for a new message from the server
-			read_size = read(client_socket_fd, data_package.data(), data_package.capacity());
+			read_size = read(client_socket_fd, data_package.data(), data_package.size());
 			
 			// Check if other thread is still running
 			if (!is_running) {
@@ -171,7 +171,7 @@ void message_receiver()
 		// Message Type - Message
 		case 4:
 			// Wait for a new message from the server
-			read_size = read(client_socket_fd, data_package.data(), data_package.capacity());
+			read_size = read(client_socket_fd, data_package.data(), data_package.size());
 			
 			// Check if other thread is still running
 			if (!is_running) {
