@@ -10,31 +10,24 @@ extern "C" {
 // SHA256 hashing function
 #include "picosha2.hpp"
 
-std::vector<uint8_t> MessageLayer::calculate_sha256_sum(void)
+void MessageLayer::calculate_sha256_sum(void)
 {
-	// Copy the header into a vector, to calculate the checksum from
-	// (Everything up to the sha256 checksum field)
-	// This constructor is not inclusive on the end byte. hence 134.
-	std::vector<uint8_t> data_to_sum(&(header[0]), &(header[134]));
 	// Calculate the checksum...
-	std::vector<uint8_t> resultant_checksum(picosha2::k_digest_size);
-	picosha2::hash256(data_to_sum.begin(), data_to_sum.end(),
-			  resultant_checksum.begin(), resultant_checksum.end());
-	// Write it to the header
-	std::memcpy(&(header[134]), &(resultant_checksum[0]),
-		    picosha2::k_digest_size);
-	// Return the checksum
-	return resultant_checksum;
+	// No longer copying to a vector. Reading and writing
+	// directly to the header.
+	picosha2::hash256(header.begin(), header.begin() + 134,
+			  header.begin() + 134, header.end());
 }
 
 // Verify the header's SHA256 checksum
 bool MessageLayer::verify_sha256_sum(void)
 {
-	// Retrieve the sha256sum from the header 134 bytes in
-	// This constructor is not inclusive on the end byte. hence 166.
-	std::vector<uint8_t> checksum_vec(&(header[134]), &(header[166]));
+	// Hash the content of the header, and place it in the checksum buffer
+	// to check whether it is valid.
+	picosha2::hash256(header.begin(), header.begin() + 134,
+			  checksum.begin(), checksum.end());
 	// Make sure the checksums match
-	return (checksum_vec == calculate_sha256_sum());
+	return std::equal(header.begin() + 134, header.end(), checksum.begin());
 }
 
 // Empty Constructor
@@ -45,7 +38,9 @@ MessageLayer::MessageLayer(void)
 
 // Move constructor
 MessageLayer::MessageLayer(MessageLayer &&ml)
-	: header(std::move(ml.header)), valid(ml.valid)
+	: header(std::move(ml.header)), checksum(std::move(ml.checksum)),
+	  valid(ml.valid)
+
 {
 }
 
@@ -55,14 +50,26 @@ MessageLayer::MessageLayer(MessageHeader &header_ref)
 	// Copy over what's been passed.
 	header = header_ref;
 	// Make sure that the checksum is valid.
-	this->valid = verify_sha256_sum();
+	valid = verify_sha256_sum();
 }
 
-// Move constructor (with header)
+// Move header constructor
 MessageLayer::MessageLayer(MessageHeader &&header_rvalue_ref)
 	: header(std::move(header_rvalue_ref))
 {
-	this->valid = verify_sha256_sum();
+	valid = verify_sha256_sum();
+}
+
+// New functions allowing complete reuse of the MessageLayer
+// object
+MessageHeader &MessageLayer::get_internal_header(void)
+{
+	return header;
+}
+
+void MessageLayer::recalculate_checksum(void)
+{
+	valid = verify_sha256_sum();
 }
 
 uint16_t MessageLayer::get_packet_number(void)
@@ -204,4 +211,23 @@ std::string build_string_safe(const char *str, size_t len)
 		}
 	}
 	return username_str;
+}
+
+// Build a message from a string and a header
+std::vector<uint8_t> build_message(MessageHeader &message_header,
+				   const std::string &message)
+{
+	// construct the entire message to send
+	std::vector<uint8_t> message_to_send;
+	// Reserve the message to be the correct size
+	message_to_send.reserve(message_header.size() + message.length() + 1);
+	// Put the header in first
+	message_to_send.insert(message_to_send.end(), message_header.begin(),
+			       message_header.end());
+	// Put in the string
+	message_to_send.insert(message_to_send.end(), message.begin(),
+			       message.end());
+	// put in the null terminator
+	message_to_send.push_back('\0');
+	return message_to_send;
 }

@@ -9,10 +9,11 @@ class MessageLayer {
 	// Message header for communications between the client and server.
 	// 166 bytes
 	MessageHeader header;
-
+	// Checksum verifying the integrity of the header.
+	std::array<uint8_t, 32> checksum;
 	// Using the current contents of the header,
 	// Calculate the the header's checksum.
-	std::vector<uint8_t> calculate_sha256_sum(void);
+	void calculate_sha256_sum(void);
 	// Verify the header's SHA256 checksum
 	bool verify_sha256_sum(void);
 	// Internal function for setting usernames within
@@ -29,6 +30,11 @@ class MessageLayer {
 	MessageLayer(MessageLayer &&ml);
 	MessageLayer(MessageHeader &header_ref);
 	MessageLayer(MessageHeader &&header_rvalue_ref);
+
+	// New functions allowing complete reuse of the MessageLayer
+	// object
+	MessageHeader &get_internal_header(void);
+	void recalculate_checksum(void);
 
 	uint16_t get_packet_number(void);
 	MessageLayer &set_packet_number(uint16_t p_num);
@@ -57,3 +63,6 @@ class MessageLayer {
 // Function for extracting strings using a length and a pointer.
 // (Message data packets)
 std::string build_string_safe(const char *str, size_t len);
+// Build a message from a string and a header
+std::vector<uint8_t> build_message(MessageHeader &message_header,
+				   const std::string &message);

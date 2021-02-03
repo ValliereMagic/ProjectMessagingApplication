@@ -30,6 +30,10 @@ int main(void)
 	// Try move constructor of the entire MessageLayer, and
 	// do a recalculation to make sure its valid.
 	MessageLayer header_4(std::move(header_3));
-	header_4.build();
+	auto &internal_header = header_4.build();
 	assert(header_4.valid);
+	// Make sure that a bad checksum is caught
+	header_4.set_message_type(0);
+	MessageLayer header_5(internal_header);
+	assert(!(header_5.valid));
 }
