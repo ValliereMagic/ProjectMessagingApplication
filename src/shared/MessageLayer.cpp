@@ -23,7 +23,7 @@ void MessageLayer::calculate_sha256_sum(void)
 bool MessageLayer::verify_sha256_sum(void)
 {
 	// Checksum verifying the integrity of the header.
-	static std::array<uint8_t, picosha2::k_digest_size> checksum;
+	std::array<uint8_t, picosha2::k_digest_size> checksum;
 	// Hash the content of the header, and place it in the checksum buffer
 	// to check whether it is valid.
 	picosha2::hash256(header.begin(), header.begin() + 134,
