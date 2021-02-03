@@ -34,7 +34,7 @@ class MessageLayer {
 	// New functions allowing complete reuse of the MessageLayer
 	// object
 	MessageHeader &get_internal_header(void);
-	void recalculate_checksum(void);
+	void verify_checksum(void);
 
 	uint16_t get_packet_number(void);
 	MessageLayer &set_packet_number(uint16_t p_num);
@@ -62,7 +62,23 @@ class MessageLayer {
 
 // Function for extracting strings using a length and a pointer.
 // (Message data packets)
+// Strings must have a double null terminator to be passed to this
+// function. Otherwise it will be built without!
 std::string build_string_safe(const char *str, size_t len);
-// Build a message from a string and a header
-std::vector<uint8_t> build_message(MessageHeader &message_header,
-				   const std::string &message);
+// Build a message from a container and a header
+template <typename T>
+std::vector<uint8_t> build_message(const MessageHeader &message_header,
+				   const T &message)
+{
+	// construct the entire message to send
+	std::vector<uint8_t> message_to_send;
+	// Reserve the message to be the correct size
+	message_to_send.reserve(message_header.size() + message.size());
+	// Put the header in first
+	message_to_send.insert(message_to_send.end(), message_header.begin(),
+			       message_header.end());
+	// Put in the string
+	message_to_send.insert(message_to_send.end(), message.begin(),
+			       message.end());
+	return message_to_send;
+}
