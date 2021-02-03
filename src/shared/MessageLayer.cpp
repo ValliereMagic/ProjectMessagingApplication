@@ -13,19 +13,21 @@ extern "C" {
 void MessageLayer::calculate_sha256_sum(void)
 {
 	// Calculate the checksum...
-	// No longer copying to a vector. Reading directly from the
-	// header instead.
+	// No longer copying to a vector. Reading and writing
+	// directly to the header.
 	picosha2::hash256(header.begin(), header.begin() + 134,
-			  checksum.begin(), checksum.end());
-	// Write it to the header
-	std::memcpy(&(header[134]), &(checksum[0]), picosha2::k_digest_size);
+			  header.begin() + 134, header.end());
 }
 
 // Verify the header's SHA256 checksum
 bool MessageLayer::verify_sha256_sum(void)
 {
-	// update the checksum
-	calculate_sha256_sum();
+	// Checksum verifying the integrity of the header.
+	static std::array<uint8_t, picosha2::k_digest_size> checksum;
+	// Hash the content of the header, and place it in the checksum buffer
+	// to check whether it is valid.
+	picosha2::hash256(header.begin(), header.begin() + 134,
+			  checksum.begin(), checksum.end());
 	// Make sure the checksums match
 	return std::equal(header.begin() + 134, header.end(), checksum.begin());
 }
@@ -38,8 +40,7 @@ MessageLayer::MessageLayer(void)
 
 // Move constructor
 MessageLayer::MessageLayer(MessageLayer &&ml)
-	: header(std::move(ml.header)), checksum(std::move(ml.checksum)),
-	  valid(ml.valid)
+	: header(std::move(ml.header)), valid(ml.valid)
 
 {
 }
