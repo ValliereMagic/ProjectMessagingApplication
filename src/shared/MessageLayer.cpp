@@ -38,7 +38,7 @@ MessageLayer::MessageLayer(void)
 
 // Move constructor
 MessageLayer::MessageLayer(MessageLayer &&ml)
-	: header(std::move(ml.header)), checksum(std::move(checksum)),
+	: header(std::move(ml.header)), checksum(std::move(ml.checksum)),
 	  valid(ml.valid)
 
 {
