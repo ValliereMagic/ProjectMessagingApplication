@@ -33,7 +33,7 @@ void cleanup_on_exit(int signum)
 {
 	// Set the atomic bool to false
 	is_running = false;
-	// Call a signal to the other thread to get them out of a read
+	// Call a signal to the other thread to kill them
 	pthread_kill(client_thread.native_handle(), SIGUSR1);
 	// Join back the client thread
 	client_thread.join();
@@ -42,9 +42,10 @@ void cleanup_on_exit(int signum)
 	exit(signum);
 }
 
-// This method is just to get thread off of read block
+// Kill off this thread
 void close_thread(int signum)
 {
+	client_thread.detach();	
 	exit(0);
 }
 
