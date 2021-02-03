@@ -9,10 +9,11 @@ class MessageLayer {
 	// Message header for communications between the client and server.
 	// 166 bytes
 	MessageHeader header;
-
+	// Checksum verifying the integrity of the header.
+	std::array<uint8_t, 32> checksum;
 	// Using the current contents of the header,
 	// Calculate the the header's checksum.
-	std::vector<uint8_t> calculate_sha256_sum(void);
+	void calculate_sha256_sum(void);
 	// Verify the header's SHA256 checksum
 	bool verify_sha256_sum(void);
 	// Internal function for setting usernames within
