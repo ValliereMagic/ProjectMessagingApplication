@@ -31,6 +31,10 @@ static int client_socket_fd;
 // It is also called when the program is closing normally.
 void cleanup_on_exit(int signum)
 {
+	// Set the atomic bool to false
+	is_running = false;
+	// Call a signal to the other thread to get them out of a read
+	pthread_kill(client_thread.native_handle(), SIGUSR1);
 	// Join back the client thread
 	client_thread.join();
 	// Close the client socket
@@ -210,7 +214,7 @@ void message_receiver()
 			break;
 		// Unsupported Message Type
 		default:
-			std::cerr << "Unsupposrted Message Type." << std::endl;
+			std::cerr << "Unsupported Message Type." << std::endl;
 		}
 	}
 }
@@ -241,6 +245,12 @@ void console_help()
 // server.
 void message_sender()
 {
+	// Largely taken from https://devarea.com/linux-handling-signals-in-a-multithreaded-application/
+	// 
+	sigset_t mask;
+	sigemptyset(&mask); 
+        sigaddset(&mask, SIGUSR2);
+	pthread_sigmask(SIG_BLOCK, &mask, NULL);
 	signal(SIGUSR2, cleanup_on_exit);
 	std::string username;
 	std::string input;
@@ -267,10 +277,6 @@ void message_sender()
 	// Send the message to the server. With no flags. Check to make sure sent.
 	if (send(client_socket_fd, (void *)(header.data()), header.size(), 0) == -1) {
 		std::cerr << "Failure to send login through socket" << std::endl;
-		// Set the atomic bool to false
-		is_running = false;
-		// Call a signal to the other thread to get them out of a read
-		pthread_kill(client_thread.native_handle(), SIGUSR1);
 		// Cleanup and exit		
 		cleanup_on_exit(EXIT_FAILURE); 
 	}
@@ -321,11 +327,6 @@ void message_sender()
 
 				// Send the message to the server. With no flags. Check to make sure sent.
 				if (send(client_socket_fd, (void *)(header.data()), header.size(), 0) == -1) {
-					std::cerr << "Failure to send who through socket" << std::endl;
-					// Set the atomic bool to false
-					is_running = false;
-					// Call a signal to the other thread to get them out of a read
-					pthread_kill(client_thread.native_handle(), SIGUSR1);
 					// Cleanup and exit		
 					cleanup_on_exit(EXIT_FAILURE); 
 				}
@@ -356,11 +357,6 @@ void message_sender()
 
 				// Send the message to the server. With no flags. Check to make sure sent.
 				if (send(client_socket_fd, (void *)(header.data()), header.size(), 0) == -1) {
-					std::cerr << "Failure to send exit header through socket" << std::endl;
-					// Set the atomic bool to false
-					is_running = false;
-					// Call a signal to the other thread to get them out of a read
-					pthread_kill(client_thread.native_handle(), SIGUSR1);
 					// Cleanup and exit		
 					cleanup_on_exit(EXIT_FAILURE); 
 				}
@@ -413,22 +409,12 @@ void message_sender()
 
 				// Send the header to the server. With no flags. Check to make sure sent.
 				if (send(client_socket_fd, (void *)(header.data()), header.size(), 0) == -1) {
-					std::cerr << "Failure to send all-message header through socket" << std::endl;
-					// Set the atomic bool to false
-					is_running = false;
-					// Call a signal to the other thread to get them out of a read
-					pthread_kill(client_thread.native_handle(), SIGUSR1);
 					// Cleanup and exit		
 					cleanup_on_exit(EXIT_FAILURE);  
 				}
 				
 				// Send the data to the server. With no flags. Check to make sure sent.
 				if (send(client_socket_fd, (void *)(message.c_str()), message.length()+1, 0) == -1) {
-					std::cerr << "Failure to send all-message data through socket" << std::endl;
-					// Set the atomic bool to false
-					is_running = false;
-					// Call a signal to the other thread to get them out of a read
-					pthread_kill(client_thread.native_handle(), SIGUSR1);
 					// Cleanup and exit		
 					cleanup_on_exit(EXIT_FAILURE); 				
 				}
@@ -455,11 +441,6 @@ void message_sender()
 
 				// Send the header to the server. With no flags. Check to make sure sent.
 				if (send(client_socket_fd, (void *)(header.data()), header.size(), 0) == -1) {
-					std::cerr << "Failure to send personal message header through socket" << std::endl;
-					// Set the atomic bool to false
-					is_running = false;
-					// Call a signal to the other thread to get them out of a read
-					pthread_kill(client_thread.native_handle(), SIGUSR1);
 					// Cleanup and exit		
 					cleanup_on_exit(EXIT_FAILURE);  
 				}
@@ -467,10 +448,6 @@ void message_sender()
 				// Send the data to the server. With no flags. Check to make sure sent.
 				if (send(client_socket_fd, (void *)(message.c_str()), message.length()+1, 0) == -1) {
 					std::cerr << "Failure to send personal message data through socket" << std::endl;
-					// Set the atomic bool to false
-					is_running = false;
-					// Call a signal to the other thread to get them out of a read
-					pthread_kill(client_thread.native_handle(), SIGUSR1);
 					// Cleanup and exit		
 					cleanup_on_exit(EXIT_FAILURE); 
 				}
