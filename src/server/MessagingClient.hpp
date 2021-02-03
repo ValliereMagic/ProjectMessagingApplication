@@ -8,6 +8,8 @@ class MessagingClient {
 	const std::string our_username;
 	MessageLayer ml;
 
+	bool send_error_message(const std::string &message);
+
     public:
 	MessagingClient(int client_socket, std::string &our_username,
 			MessageLayer &&ml);
