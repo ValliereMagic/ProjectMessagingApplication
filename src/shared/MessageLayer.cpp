@@ -50,14 +50,26 @@ MessageLayer::MessageLayer(MessageHeader &header_ref)
 	// Copy over what's been passed.
 	header = header_ref;
 	// Make sure that the checksum is valid.
-	this->valid = verify_sha256_sum();
+	valid = verify_sha256_sum();
 }
 
 // Move header constructor
 MessageLayer::MessageLayer(MessageHeader &&header_rvalue_ref)
 	: header(std::move(header_rvalue_ref))
 {
-	this->valid = verify_sha256_sum();
+	valid = verify_sha256_sum();
+}
+
+// New functions allowing complete reuse of the MessageLayer
+// object
+MessageHeader &MessageLayer::get_internal_header(void)
+{
+	return header;
+}
+
+void MessageLayer::verify_checksum(void)
+{
+	valid = verify_sha256_sum();
 }
 
 uint16_t MessageLayer::get_packet_number(void)
