@@ -12,8 +12,6 @@ extern "C" {
 }
 #include "MessagingClient.hpp"
 
-// Live threads of execution. Joined on exit
-static std::vector<std::thread> client_threads;
 // client_objects map accessable from all client threads
 // Thread safe access from the functions implemented in this file
 // using posix rw_locks.
@@ -25,10 +23,6 @@ static int server_socket_fd;
 
 void cleanup_on_exit(int signum)
 {
-	// Join back all the client threads
-	for (auto &th : client_threads) {
-		th.join();
-	}
 	// destroy the rwlock
 	pthread_rwlock_destroy(&client_objects_lock);
 	// Close the server socket
@@ -323,8 +317,7 @@ int main(void)
 			exit(EXIT_FAILURE);
 		}
 		// Set up the client thread for this connection.
-		client_threads.push_back(
-			std::thread(login_procedure, new_client_socket));
+		std::thread(login_procedure, new_client_socket).detach();
 	}
 	return 0;
 }
