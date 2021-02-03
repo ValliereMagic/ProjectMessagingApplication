@@ -9,3 +9,5 @@ bool send_to_client(const std::string &username,
 // send a message to all participating clients
 bool send_to_all(const std::string &our_username,
 		 const std::vector<uint8_t> &message);
+// Get list of logged in users
+std::string get_logged_in_users(void);

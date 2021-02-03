@@ -2,6 +2,7 @@
 #include <thread>
 #include <csignal>
 #include <unordered_map>
+#include <sstream>
 extern "C" {
 #include <unistd.h>
 #include <sys/socket.h>
@@ -108,6 +109,31 @@ bool send_to_client(const std::string &username,
 	return send_success;
 }
 
+// Get CSV list of logged in users
+std::string get_logged_in_users(void)
+{
+	std::stringstream usernames;
+	// Open the lock for reading
+	if (pthread_rwlock_rdlock(&client_objects_lock) != 0) {
+		std::cerr << "Unable to lock the rwlock for reading."
+			  << std::endl;
+		exit(EXIT_FAILURE);
+	}
+	// Add all the usernames to CSV string
+	for (auto &user : client_objects) {
+		usernames << user.first << ", ";
+	}
+	// add null terminator
+	usernames << '\0';
+	// Close the lock for reading
+	if (pthread_rwlock_unlock(&client_objects_lock) != 0) {
+		std::cerr << "Unable to unlock the rwlock after reading."
+			  << std::endl;
+		exit(EXIT_FAILURE);
+	}
+	return usernames.str();
+}
+
 // Setup the login procedure, which requires a write to the
 // client_objects map.
 static void login_procedure(int client_socket)
@@ -190,8 +216,8 @@ static void login_procedure(int client_socket)
 		// Set the required header information
 		ml.set_data_packet_length(username.length() + 1);
 		MessageHeader &header = ml.build();
-		auto message_to_send = build_message(
-			header, "Invalid username to login with.");
+		std::string error_message = "Invalid username to login with.\0";
+		auto message_to_send = build_message(header, error_message);
 		// Send off the error message to the client
 		if (send(client_socket, message_to_send.data(),
 			 message_to_send.size(),
