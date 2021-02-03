@@ -35,12 +35,45 @@ void cleanup_on_exit(int signum)
 	exit(signum);
 }
 
-// Lookup client's fd by username using the rwlock
-// within client_objects
-// -1 if the client doesn't exist!
-int lookup_client(std::string &username)
+// Send a message to all connected clients except for ourselves.
+bool send_to_all(const std::string &our_username,
+		 const std::vector<uint8_t> &message)
 {
-	int client_fd = -1;
+	// Open the lock for reading
+	if (pthread_rwlock_rdlock(&client_objects_lock) != 0) {
+		std::cerr << "Unable to lock the rwlock for reading."
+			  << std::endl;
+		exit(EXIT_FAILURE);
+	}
+	bool send_success = true;
+	// Send the message to each client
+	for (auto &user : client_objects) {
+		// Don't send it to ourselves
+		if (user.first != our_username) {
+			int client_fd = (user.second).get_client_socket();
+			// Send the message
+			if (send(client_fd, message.data(), message.size(), 0) <
+			    (ssize_t)message.size()) {
+				std::cerr
+					<< "Unable to send a message to a client socket."
+					<< std::endl;
+				send_success = false;
+			}
+		}
+	}
+	// Close the lock for reading
+	if (pthread_rwlock_unlock(&client_objects_lock) != 0) {
+		std::cerr << "Unable to unlock the rwlock after reading."
+			  << std::endl;
+		exit(EXIT_FAILURE);
+	}
+	return send_success;
+}
+
+// Send a message to another client by username
+bool send_to_client(const std::string &username,
+		    const std::vector<uint8_t> &message)
+{
 	// Open the lock for reading
 	if (pthread_rwlock_rdlock(&client_objects_lock) != 0) {
 		std::cerr << "Unable to lock the rwlock for reading."
@@ -49,10 +82,21 @@ int lookup_client(std::string &username)
 	}
 
 	// Check if the user exists. If it does,
-	// return its socket fd. Otherwise, don't bother.
+	// send them the message.
 	auto client_fd_it = client_objects.find(username);
+	bool send_success = true;
 	if (client_fd_it != client_objects.end()) {
-		client_fd = (client_fd_it->second).get_client_socket();
+		// get the file discriptor for the client we are sending
+		// a message to.
+		int client_fd = (client_fd_it->second).get_client_socket();
+		// Send the message
+		if (send(client_fd, message.data(), message.size(), 0) <
+		    (ssize_t)message.size()) {
+			std::cerr
+				<< "Unable to send a message to a client socket."
+				<< std::endl;
+			send_success = false;
+		}
 	}
 
 	// Close the lock for reading
@@ -61,8 +105,7 @@ int lookup_client(std::string &username)
 			  << std::endl;
 		exit(EXIT_FAILURE);
 	}
-
-	return client_fd;
+	return send_success;
 }
 
 // Setup the login procedure, which requires a write to the
@@ -97,6 +140,14 @@ static void login_procedure(int client_socket)
 	}
 	// Were good. Pull the username.
 	std::string username = ml.get_source_username();
+
+	// Build the login response message early, so we can move
+	// the MessageLayer to MessagingClient on creation.
+	ml.get_internal_header().fill(0);
+	ml.set_message_type(0);
+	ml.set_dest_username(username);
+	MessageHeader login_response = ml.build_cpy();
+
 	// Create a MessagingClient, and insert it into the shared
 	// HashMap.
 	bool user_duplicate = false;
@@ -131,9 +182,37 @@ static void login_procedure(int client_socket)
 	if (messaging_client == nullptr || user_duplicate == true) {
 		std::cerr << "Client: " << username << " already exists."
 			  << std::endl;
+		// The user was unable to get logged in due to their
+		// bad username.
+		ml.get_internal_header().fill(0);
+		ml.set_message_type(1);
+		ml.set_dest_username(username);
+		// Set the required header information
+		ml.set_data_packet_length(username.length() + 1);
+		MessageHeader &header = ml.build();
+		auto message_to_send = build_message(
+			header, "Invalid username to login with.");
+		// Send off the error message to the client
+		if (send(client_socket, message_to_send.data(),
+			 message_to_send.size(),
+			 0) < (ssize_t)message_to_send.size()) {
+			std::cerr << "Error sending login error to client."
+				  << std::endl;
+		}
 		close(client_socket);
 		return;
 	}
+
+	// Send back the login verification
+	if (send(client_socket, login_response.data(), login_response.size(),
+		 0) < (ssize_t)login_response.size()) {
+		std::cerr
+			<< "Unable to send back the login verification message."
+			<< std::endl;
+		close(client_socket);
+		return;
+	}
+
 	// This thread becomes the client thread in MessagingClient.
 	messaging_client->client();
 	// When we return to here, it means we are done with the
@@ -218,7 +297,8 @@ int main(void)
 			exit(EXIT_FAILURE);
 		}
 		// Set up the client thread for this connection.
-		client_threads.push_back(std::thread(login_procedure, new_client_socket));
+		client_threads.push_back(
+			std::thread(login_procedure, new_client_socket));
 	}
 	return 0;
 }

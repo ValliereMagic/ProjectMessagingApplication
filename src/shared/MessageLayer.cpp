@@ -50,14 +50,26 @@ MessageLayer::MessageLayer(MessageHeader &header_ref)
 	// Copy over what's been passed.
 	header = header_ref;
 	// Make sure that the checksum is valid.
-	this->valid = verify_sha256_sum();
+	valid = verify_sha256_sum();
 }
 
 // Move header constructor
 MessageLayer::MessageLayer(MessageHeader &&header_rvalue_ref)
 	: header(std::move(header_rvalue_ref))
 {
-	this->valid = verify_sha256_sum();
+	valid = verify_sha256_sum();
+}
+
+// New functions allowing complete reuse of the MessageLayer
+// object
+MessageHeader &MessageLayer::get_internal_header(void)
+{
+	return header;
+}
+
+void MessageLayer::recalculate_checksum(void)
+{
+	valid = verify_sha256_sum();
 }
 
 uint16_t MessageLayer::get_packet_number(void)
@@ -199,4 +211,23 @@ std::string build_string_safe(const char *str, size_t len)
 		}
 	}
 	return username_str;
+}
+
+// Build a message from a string and a header
+std::vector<uint8_t> build_message(MessageHeader &message_header,
+				   const std::string &message)
+{
+	// construct the entire message to send
+	std::vector<uint8_t> message_to_send;
+	// Reserve the message to be the correct size
+	message_to_send.reserve(message_header.size() + message.length() + 1);
+	// Put the header in first
+	message_to_send.insert(message_to_send.end(), message_header.begin(),
+			       message_header.end());
+	// Put in the string
+	message_to_send.insert(message_to_send.end(), message.begin(),
+			       message.end());
+	// put in the null terminator
+	message_to_send.push_back('\0');
+	return message_to_send;
 }
