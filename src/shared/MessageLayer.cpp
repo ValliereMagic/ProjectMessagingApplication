@@ -10,31 +10,24 @@ extern "C" {
 // SHA256 hashing function
 #include "picosha2.hpp"
 
-std::vector<uint8_t> MessageLayer::calculate_sha256_sum(void)
+void MessageLayer::calculate_sha256_sum(void)
 {
-	// Copy the header into a vector, to calculate the checksum from
-	// (Everything up to the sha256 checksum field)
-	// This constructor is not inclusive on the end byte. hence 134.
-	std::vector<uint8_t> data_to_sum(&(header[0]), &(header[134]));
 	// Calculate the checksum...
-	std::vector<uint8_t> resultant_checksum(picosha2::k_digest_size);
-	picosha2::hash256(data_to_sum.begin(), data_to_sum.end(),
-			  resultant_checksum.begin(), resultant_checksum.end());
+	// No longer copying to a vector. Reading directly from the
+	// header instead.
+	picosha2::hash256(header.begin(), header.begin() + 134,
+			  checksum.begin(), checksum.end());
 	// Write it to the header
-	std::memcpy(&(header[134]), &(resultant_checksum[0]),
-		    picosha2::k_digest_size);
-	// Return the checksum
-	return resultant_checksum;
+	std::memcpy(&(header[134]), &(checksum[0]), picosha2::k_digest_size);
 }
 
 // Verify the header's SHA256 checksum
 bool MessageLayer::verify_sha256_sum(void)
 {
-	// Retrieve the sha256sum from the header 134 bytes in
-	// This constructor is not inclusive on the end byte. hence 166.
-	std::vector<uint8_t> checksum_vec(&(header[134]), &(header[166]));
+	// update the checksum
+	calculate_sha256_sum();
 	// Make sure the checksums match
-	return (checksum_vec == calculate_sha256_sum());
+	return std::equal(header.begin() + 134, header.end(), checksum.begin());
 }
 
 // Empty Constructor
@@ -45,7 +38,9 @@ MessageLayer::MessageLayer(void)
 
 // Move constructor
 MessageLayer::MessageLayer(MessageLayer &&ml)
-	: header(std::move(ml.header)), valid(ml.valid)
+	: header(std::move(ml.header)), checksum(std::move(checksum)),
+	  valid(ml.valid)
+
 {
 }
 
@@ -58,7 +53,7 @@ MessageLayer::MessageLayer(MessageHeader &header_ref)
 	this->valid = verify_sha256_sum();
 }
 
-// Move constructor (with header)
+// Move header constructor
 MessageLayer::MessageLayer(MessageHeader &&header_rvalue_ref)
 	: header(std::move(header_rvalue_ref))
 {
