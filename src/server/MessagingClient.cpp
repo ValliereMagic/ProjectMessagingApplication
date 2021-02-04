@@ -24,7 +24,7 @@ bool MessagingClient::send_error_message(const std::string &message)
 	ml.set_message_type(1);
 	ml.set_dest_username(our_username);
 	// Set the required header information
-	ml.set_data_packet_length(our_username.length());
+	ml.set_data_packet_length(message.length());
 	MessageHeader &header = ml.build();
 	auto message_to_send = build_message(header, message);
 	return send_to_client(our_username, message_to_send);
@@ -146,6 +146,8 @@ void MessagingClient::client(void)
 			std::string leave_message =
 				"User: " + our_username +
 				" disconnected from the room.\0";
+			ml.set_data_packet_length(leave_message.size());
+			ml.build();
 			send_to_all(our_username,
 				    build_message(header, leave_message));
 			// Return and allow login_procedure to finish
