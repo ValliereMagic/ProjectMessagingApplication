@@ -24,7 +24,7 @@ bool MessagingClient::send_error_message(const std::string &message)
 	ml.set_message_type(1);
 	ml.set_dest_username(our_username);
 	// Set the required header information
-	ml.set_data_packet_length(our_username.length());
+	ml.set_data_packet_length(message.length());
 	MessageHeader &header = ml.build();
 	auto message_to_send = build_message(header, message);
 	return send_to_client(our_username, message_to_send);
