@@ -208,9 +208,9 @@ static void login_procedure(int client_socket)
 		ml.set_message_type(1);
 		ml.set_dest_username(username);
 		// Set the required header information
-		ml.set_data_packet_length(username.length() + 1);
-		MessageHeader &header = ml.build();
 		std::string error_message = "Invalid username to login with.\0";
+		ml.set_data_packet_length(error_message.length());
+		MessageHeader &header = ml.build();
 		auto message_to_send = build_message(header, error_message);
 		// Send off the error message to the client
 		if (send(client_socket, message_to_send.data(),
