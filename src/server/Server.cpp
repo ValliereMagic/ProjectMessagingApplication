@@ -12,8 +12,6 @@ extern "C" {
 }
 #include "MessagingClient.hpp"
 
-// Live threads of execution. Joined on exit
-static std::vector<std::thread> client_threads;
 // client_objects map accessable from all client threads
 // Thread safe access from the functions implemented in this file
 // using posix rw_locks.
@@ -25,10 +23,6 @@ static int server_socket_fd;
 
 void cleanup_on_exit(int signum)
 {
-	// Join back all the client threads
-	for (auto &th : client_threads) {
-		th.join();
-	}
 	// destroy the rwlock
 	pthread_rwlock_destroy(&client_objects_lock);
 	// Close the server socket
@@ -98,6 +92,8 @@ bool send_to_client(const std::string &username,
 				<< std::endl;
 			send_success = false;
 		}
+	} else {
+		send_success = false;
 	}
 
 	// Close the lock for reading
@@ -214,9 +210,9 @@ static void login_procedure(int client_socket)
 		ml.set_message_type(1);
 		ml.set_dest_username(username);
 		// Set the required header information
-		ml.set_data_packet_length(username.length() + 1);
-		MessageHeader &header = ml.build();
 		std::string error_message = "Invalid username to login with.\0";
+		ml.set_data_packet_length(error_message.length());
+		MessageHeader &header = ml.build();
 		auto message_to_send = build_message(header, error_message);
 		// Send off the error message to the client
 		if (send(client_socket, message_to_send.data(),
@@ -323,8 +319,7 @@ int main(void)
 			exit(EXIT_FAILURE);
 		}
 		// Set up the client thread for this connection.
-		client_threads.push_back(
-			std::thread(login_procedure, new_client_socket));
+		std::thread(login_procedure, new_client_socket).detach();
 	}
 	return 0;
 }
