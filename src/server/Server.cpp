@@ -92,6 +92,8 @@ bool send_to_client(const std::string &username,
 				<< std::endl;
 			send_success = false;
 		}
+	} else {
+		send_success = false;
 	}
 
 	// Close the lock for reading
