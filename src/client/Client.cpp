@@ -33,7 +33,7 @@ void cleanup_on_exit(int signum)
 {
 	// Set the atomic bool to false
 	is_running = false;
-	// Call a signal to the other thread to kill them
+	// Call a signal to the other thread to kill themself
 	pthread_kill(client_thread.native_handle(), SIGUSR1);
 	// Join back the client thread
 	client_thread.join();
@@ -42,9 +42,12 @@ void cleanup_on_exit(int signum)
 	exit(signum);
 }
 
+// Handler SIGUSR1
 // Kill off this thread
 void close_thread(int signum)
 {
+	// Slightly dirty method to get rid of thread without being able to join
+	// Returning will just put us back in socket read block.
 	client_thread.detach();	
 	exit(0);
 }
@@ -340,12 +343,6 @@ void message_sender()
 			else if (input.size() > 3  && (input.compare(0, 4, "exit") == 0)) {
 				// Create a bye packet
 
-				// Call a signal to the other thread to die.
-				pthread_kill(client_thread.native_handle(), SIGUSR1);
-
-				// Kill itself
-				cleanup_on_exit(0);
-
 				MessageHeader &header = header_1.set_packet_number(packet_number)
 					.set_version_number(VERSION)
 					.set_source_username(username)
@@ -363,9 +360,7 @@ void message_sender()
 					cleanup_on_exit(EXIT_FAILURE); 
 				}
 				is_running = false;		
-				// Call a signal to the other thread to die.
-				pthread_kill(client_thread.native_handle(), SIGUSR1);
-				// Kill itself
+				// Clean and kill both threads
 				cleanup_on_exit(0);
 			}
 			// Check if its 'help'
