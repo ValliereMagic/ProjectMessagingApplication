@@ -130,10 +130,18 @@ std::string get_logged_in_users(void)
 	return usernames.str();
 }
 
+uint16_t &increment_packet_number(uint16_t &num)
+{
+	num = (num + 1) % UINT16_MAX;
+	return num;
+}
+
 // Setup the login procedure, which requires a write to the
 // client_objects map.
 static void login_procedure(int client_socket)
 {
+	// Packet numbers for the login sequence
+	uint16_t login_packet_number = 1;
 	// See if the client is trying to login:
 	MessageHeader header;
 	header.fill(0);
@@ -166,8 +174,10 @@ static void login_procedure(int client_socket)
 	// Build the login response message early, so we can move
 	// the MessageLayer to MessagingClient on creation.
 	ml.get_internal_header().fill(0);
-	ml.set_message_type(0);
-	ml.set_dest_username(username);
+	ml.set_version_number(MessagingClient::version)
+		.set_packet_number(login_packet_number)
+		.set_message_type(0)
+		.set_dest_username(username);
 	MessageHeader login_response = ml.build_cpy();
 
 	// Create a MessagingClient, and insert it into the shared
@@ -186,8 +196,9 @@ static void login_procedure(int client_socket)
 		user_duplicate = true;
 	} else {
 		client_objects.insert(std::make_pair(
-			username, MessagingClient(client_socket, username,
-						  std::move(ml))));
+			username,
+			MessagingClient(client_socket, login_packet_number,
+					username, std::move(ml))));
 		// variable 'ml' no longer valid after move.
 		// Cannot copy a client object. Only reference it and move it.
 		// It is owned by client_objects, and we are now borrowing it.
@@ -206,13 +217,17 @@ static void login_procedure(int client_socket)
 			  << std::endl;
 		// The user was unable to get logged in due to their
 		// bad username.
+		// Clear the header
 		ml.get_internal_header().fill(0);
-		ml.set_message_type(1);
-		ml.set_dest_username(username);
 		// Set the required header information
 		std::string error_message = "Invalid username to login with.\0";
-		ml.set_data_packet_length(error_message.length());
-		MessageHeader &header = ml.build();
+		MessageHeader &header =
+			ml.set_message_type(1)
+				.set_version_number(MessagingClient::version)
+				.set_packet_number(login_packet_number)
+				.set_dest_username(username)
+				.set_data_packet_length(error_message.length())
+				.build();
 		auto message_to_send = build_message(header, error_message);
 		// Send off the error message to the client
 		if (send(client_socket, message_to_send.data(),
@@ -225,7 +240,7 @@ static void login_procedure(int client_socket)
 		return;
 	}
 
-	// Send back the login verification
+	// Send back the login verification we built before the lock began
 	if (send(client_socket, login_response.data(), login_response.size(),
 		 0) < (ssize_t)login_response.size()) {
 		std::cerr
