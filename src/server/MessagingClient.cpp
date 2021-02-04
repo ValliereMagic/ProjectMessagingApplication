@@ -143,6 +143,7 @@ void MessagingClient::client(void)
 			ml.set_message_type(4);
 			ml.set_source_username("server");
 			ml.set_dest_username("all");
+			ml.build();
 			std::string leave_message =
 				"User: " + our_username +
 				" disconnected from the room.\0";
