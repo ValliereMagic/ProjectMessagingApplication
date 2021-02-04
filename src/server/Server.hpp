@@ -11,3 +11,5 @@ bool send_to_all(const std::string &our_username,
 		 const std::vector<uint8_t> &message);
 // Get list of logged in users
 std::string get_logged_in_users(void);
+// Rolling packet incrementer
+uint16_t &increment_packet_number(uint16_t &num);
