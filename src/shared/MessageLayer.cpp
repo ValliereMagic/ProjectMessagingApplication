@@ -201,7 +201,7 @@ MessageHeader MessageLayer::build_cpy(void)
 std::string build_string_safe(const char *str, size_t len)
 {
 	std::string username_str = "";
-	for (uint8_t i = 0; i < len; ++i) {
+	for (size_t i = 0; i < len; ++i) {
 		// While there are still characters to add, continue.
 		// Otherwise stop.
 		if (str[i] != '\0') {
