@@ -36,6 +36,16 @@ void MessagingClient::client(void)
 		  << std::endl;
 	// Retrieve our message header for writing
 	MessageHeader &header = ml.get_internal_header();
+	// Send out a message that I have logged in
+	header.fill(0);
+	ml.set_message_type(4);
+	ml.set_source_username("server");
+	ml.set_dest_username("all");
+	std::string login_message =
+		"User: " + our_username + " entered the room.\0";
+	ml.set_data_packet_length(login_message.length());
+	ml.build();
+	send_to_all(our_username, build_message(header, login_message));
 	// The main receive loop
 	while (true) {
 		header.fill(0);
