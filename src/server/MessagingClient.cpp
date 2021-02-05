@@ -1,3 +1,19 @@
+/*======================================================================
+COIS-4310H Assignment 1 - MessagingClient
+Name: MessagingClient.cpp
+Written By: Trevor Gilbert & Adam Melaney
+Purpose: This object represents the main receive thread of the server.
+	Each client connected, has an instance of this class running on the server
+	executing the 'client' method. When client is returned from, it means
+	this client is disconnecting.
+
+Compilation: Please use the provided Make file that will make both the
+	client and the server.
+
+Requires the shared MessageLayer Class that is used in to create
+a shared header for transit.
+----------------------------------------------------------------------*/
+
 #include <iostream>
 #include "Server.hpp"
 #include "MessagingClient.hpp"
@@ -5,6 +21,10 @@ extern "C" {
 #include <unistd.h>
 }
 
+// Initialize a Messaging client, with a client_socket to read information
+// from, and offer up to other instances through the get_client_socket() method.
+// When the message layer ml is passed to constructor, MessageingClient takes
+// ownership of that object.
 MessagingClient::MessagingClient(int client_socket, uint16_t packet_number,
 				 std::string &our_username, MessageLayer &&ml)
 	: client_socket(client_socket), our_username(our_username),
@@ -12,6 +32,8 @@ MessagingClient::MessagingClient(int client_socket, uint16_t packet_number,
 {
 }
 
+// This is a move constructor taking and consuming another instance of MessagingClient
+// this is for efficiency, as less memory gets copied around.
 MessagingClient::MessagingClient(MessagingClient &&client)
 	: client_socket(client.client_socket),
 	  our_username(std::move(client.our_username)),
@@ -19,6 +41,7 @@ MessagingClient::MessagingClient(MessagingClient &&client)
 {
 }
 
+// I sent error messages enough to make a function to do just that.
 bool MessagingClient::send_error_message(const std::string &message)
 {
 	// Clear the header
@@ -36,6 +59,7 @@ bool MessagingClient::send_error_message(const std::string &message)
 	return send_to_client(our_username, message_to_send);
 }
 
+// Main client loop, one for each connected client.
 void MessagingClient::client(void)
 {
 	std::cout << "Started Receiving thread for client: " << our_username
@@ -117,7 +141,7 @@ void MessagingClient::client(void)
 				       build_message(header, usernames));
 			break;
 		}
-		// Message ACK
+		// Message ACK (Not implemented until later assignments)
 		case 3: {
 			continue;
 			break;
@@ -189,6 +213,11 @@ void MessagingClient::client(void)
 	}
 }
 
+// Called by other instances (within send_to_all, and send_to_client)
+// to get the socket fd of this client so another thread can send us
+// a message.
+// these functions are in Server.cpp since they have to be managed
+// by the rwlock.
 int MessagingClient::get_client_socket(void)
 {
 	return client_socket;
