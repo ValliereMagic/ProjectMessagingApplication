@@ -1,3 +1,16 @@
+/*======================================================================
+COIS-4310H Assignment 1 - MessageLayer
+Name: MessageLayer.cpp
+Written By:  Adam Melaney & Trevor Gilbert 
+Purpose: Allow the creation, verification, and unpacking of message headers
+	as a single class and interface, following the builder pattern; to handle
+	everything we do in the client and server with message headers. As well
+	as functionality to build strings that can be sent as message data portions.
+
+Creation: Please use the provided Make file that will make both the
+	client and the server.
+----------------------------------------------------------------------*/
+
 #include <cstdint>
 #include <memory>
 #include <cstring>
@@ -10,16 +23,18 @@ extern "C" {
 // SHA256 hashing function
 #include "picosha2.hpp"
 
+// Calculate the checksum of the contents of the header,
+// and write it to the 32 bytes (256 bits) that make up
+// the checksum section of the header.
 void MessageLayer::calculate_sha256_sum(void)
 {
-	// Calculate the checksum...
-	// No longer copying to a vector. Reading and writing
-	// directly to the header.
 	picosha2::hash256(header.begin(), header.begin() + 134,
 			  header.begin() + 134, header.end());
 }
 
-// Verify the header's SHA256 checksum
+// Verify the checksum of the header's contents against
+// the checksum stored in the header. If they aren't the same
+// there is something amiss within the header.
 bool MessageLayer::verify_sha256_sum(void)
 {
 	// Hash the content of the header, and place it in the checksum buffer
@@ -30,13 +45,15 @@ bool MessageLayer::verify_sha256_sum(void)
 	return std::equal(header.begin() + 134, header.end(), checksum.begin());
 }
 
-// Empty Constructor
+// Build a brand-new squeaky clean MessageLayer.
 MessageLayer::MessageLayer(void)
 {
 	header.fill(0);
 }
 
-// Move constructor
+// Consume the moved MessageLayer passed, and take ownership
+// of all its members. After this is done, the passed message layer should
+// not be used again and should be considered invalid.
 MessageLayer::MessageLayer(MessageLayer &&ml)
 	: header(std::move(ml.header)), checksum(std::move(ml.checksum)),
 	  valid(ml.valid)
@@ -44,7 +61,8 @@ MessageLayer::MessageLayer(MessageLayer &&ml)
 {
 }
 
-// Copy Constructor (with checksum verification)
+// Construct a new MessageLayer using a passed message header.
+// Check the validity of the passed header upon initialization.
 MessageLayer::MessageLayer(MessageHeader &header_ref)
 {
 	// Copy over what's been passed.
@@ -53,36 +71,41 @@ MessageLayer::MessageLayer(MessageHeader &header_ref)
 	valid = verify_sha256_sum();
 }
 
-// Move header constructor
+// Constructor that takes ownership of the passed MessageHeader.
+// The MessageHeader passed in should be considered invalid on its
+// own after this is executed, as it is now apart of this new
+// MessageLayer.
 MessageLayer::MessageLayer(MessageHeader &&header_rvalue_ref)
 	: header(std::move(header_rvalue_ref))
 {
 	valid = verify_sha256_sum();
 }
 
-// New functions allowing complete reuse of the MessageLayer
-// object
+// Return a reference to the internal header stored within this message
+// layer. Very useful for reusing the same header over and over again.
 MessageHeader &MessageLayer::get_internal_header(void)
 {
 	return header;
 }
 
+// Being able to verify the checksum at any time is very useful for the
+// reuse of the MessageLayer.
 void MessageLayer::verify_checksum(void)
 {
 	valid = verify_sha256_sum();
 }
 
+// Retrieve the first 2 bytes from the header
+// and convert them to host format and return
 uint16_t MessageLayer::get_packet_number(void)
 {
-	// Retrieve the first 2 bytes from the header
-	// and convert them to host format and return
 	return ntohs(*((uint16_t *)&(header[0])));
 }
 
+// Convert the passed short to network byte order,
+// and assign it to its place in the header.
 MessageLayer &MessageLayer::set_packet_number(uint16_t p_num)
 {
-	// Convert the passed short to network byte order,
-	// and assign it to its place in the header.
 	(*((uint16_t *)&(header[0]))) = htons(p_num);
 	return (*this);
 }
@@ -94,13 +117,14 @@ uint8_t MessageLayer::get_version_number(void)
 
 MessageLayer &MessageLayer::set_version_number(uint8_t v_num)
 {
-	// assign version number to its place in the header.
 	header[2] = v_num;
 	return (*this);
 }
 
 // Internal function for setting usernames within
 // the header
+// Specific function, making sure the length is never longer than
+// 31 bytes plus the null terminator.
 void MessageLayer::set_username(const std::string &source_username,
 				char *header_ptr)
 {
@@ -118,37 +142,37 @@ void MessageLayer::set_username(const std::string &source_username,
 	header_ptr[min] = '\0';
 }
 
+// Index into header to the start of the source username,
+// and pull the correct number of bytes (up to 32)
 std::string MessageLayer::get_source_username(void)
 {
-	// Index into header to the start of the source username,
-	// and pull the correct number of bytes (up to 32)
 	char *username = (char *)&(header[3]);
 	return build_string_safe(username, 32);
 }
 
+// Copy passed string into the message header, and
+// ensure that a null terminator is set, by setting one ourselves.
 MessageLayer &
 MessageLayer::set_source_username(const std::string &source_username)
 {
-	// Copy passed string into the message header, and
-	// ensure that a null terminator is set, by setting one ourselves.
 	char *username = (char *)&(header[3]);
 	this->set_username(source_username, username);
 	return (*this);
 }
 
+// Index into header to the start of the destination username,
+// and pull the correct number of bytes (up to 32)
 std::string MessageLayer::get_dest_username(void)
 {
-	// Index into header to the start of the destination username,
-	// and pull the correct number of bytes (up to 32)
 	char *username = (char *)&(header[35]);
 	return build_string_safe(username, 32);
 }
 
+// Copy passed string into the message header, and
+// ensure that a null terminator is set, by setting one ourselves.
 MessageLayer &
 MessageLayer::set_dest_username(const std::string &source_username)
 {
-	// Copy passed string into the message header, and
-	// ensure that a null terminator is set, by setting one ourselves.
 	char *username = (char *)&(header[35]);
 	this->set_username(source_username, username);
 	return (*this);
@@ -156,25 +180,25 @@ MessageLayer::set_dest_username(const std::string &source_username)
 
 uint8_t MessageLayer::get_message_type(void)
 {
-	// 67 bytes into the header is our message type
 	return header[67];
 }
 
 MessageLayer &MessageLayer::set_message_type(uint8_t m_type)
 {
-	// assign message type to its place in the header.
 	header[67] = m_type;
 	return (*this);
 }
 
+// Retrieve the data packet length from the header
+// Which is 2 bytes, 68 bytes into the header,
+// and convert them to host format and return
 uint16_t MessageLayer::get_data_packet_length(void)
 {
-	// Retrieve the data packet length from the header
-	// Which is 2 bytes, 68 bytes into the header,
-	// and convert them to host format and return
 	return ntohs(*((uint16_t *)&(header[68])));
 }
 
+// convert the passed short to network byte order
+// and put it in it's place within the header.
 MessageLayer &MessageLayer::set_data_packet_length(uint16_t data_packet_len)
 {
 	// Convert the passed short to network byte order,
@@ -183,12 +207,18 @@ MessageLayer &MessageLayer::set_data_packet_length(uint16_t data_packet_len)
 	return (*this);
 }
 
+// calculate the checksum for the header, and return a reference to
+// the internal header of the MessageLayer.
+// (last function called in builder pattern when setting the attributes)
 MessageHeader &MessageLayer::build(void)
 {
 	calculate_sha256_sum();
 	return header;
 }
 
+// calculate the checksum for the header, and return a copy
+// of the internal header of the MessageLayer.
+// (last function called in builder pattern when setting the attributes)
 MessageHeader MessageLayer::build_cpy(void)
 {
 	calculate_sha256_sum();
@@ -198,6 +228,8 @@ MessageHeader MessageLayer::build_cpy(void)
 
 // Function for extracting strings using a length and a pointer.
 // (Message data packets)
+// using a length instead of a null terminator, hence the hopefully
+// added safety.
 std::string build_string_safe(const char *str, size_t len)
 {
 	std::string username_str = "";
