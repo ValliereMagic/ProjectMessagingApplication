@@ -1,3 +1,22 @@
+/*======================================================================
+COIS 4310 Assignment 1 - Client
+Name: client.cpp
+Written By: Trevor Gilbert & Adam Melaney
+Purpose: This is a client for a messenger application, that will use 2
+threads to to listen and send to a server. 
+
+usage: ./MessageClient
+
+Description of Parameters
+	None
+
+Creation: Please use the provided Make file that will make both the
+client and the server.
+
+Requires the shared MessageLayer Class that is used in to create
+a shared header for transit.
+----------------------------------------------------------------------*/ 
+
 #include <iostream>
 #include <thread>
 #include <csignal>
