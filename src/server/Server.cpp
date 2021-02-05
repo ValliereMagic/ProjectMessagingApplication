@@ -1,3 +1,22 @@
+/*======================================================================
+COIS 4310 Assignment 1 - server
+Name: server.cpp
+Written By:  Adam Melaney & Trevor Gilbert 
+Purpose: This is a server for a messenger application, that will use one
+thread for each client connecting.
+
+usage: ./MessageServer
+
+Description of Parameters
+	None
+
+Creation: Please use the provided Make file that will make both the
+client and the server.
+
+Requires the shared MessageLayer Class that is used in to create
+a shared header for transit.
+----------------------------------------------------------------------*/ 
+
 #include <iostream>
 #include <thread>
 #include <csignal>
