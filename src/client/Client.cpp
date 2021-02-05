@@ -1,21 +1,21 @@
 /*======================================================================
-COIS 4310 Assignment 1 - Client
-Name: client.cpp
+COIS-4310H Assignment 1 - Client
+Name: Client.cpp
 Written By: Trevor Gilbert & Adam Melaney
 Purpose: This is a client for a messenger application, that will use 2
-threads to to listen and send to a server. 
+	threads to to listen and send to a server. 
 
-usage: ./MessageClient
+Usage: ./MessageClient
 
 Description of Parameters
 	None
 
-Creation: Please use the provided Make file that will make both the
-client and the server.
+Compilation: Please use the provided Make file that will make both the
+	client and the server.
 
 Requires the shared MessageLayer Class that is used in to create
 a shared header for transit.
-----------------------------------------------------------------------*/ 
+----------------------------------------------------------------------*/
 
 #include <iostream>
 #include <thread>
@@ -39,9 +39,8 @@ extern "C" {
 
 // Live thread of execution. Joined on exit
 static std::thread client_thread;
-
+// Atomic bool for showing when both threads are running.
 static std::atomic<bool> is_running;
-
 
 // The client socket file descriptor. Global
 static int client_socket_fd;
@@ -67,19 +66,19 @@ void close_thread(int signum)
 {
 	// Slightly dirty method to get rid of thread without being able to join
 	// Returning will just put us back in socket read block.
-	client_thread.detach();	
+	client_thread.detach();
 	exit(0);
 }
 
-// This function is run by the thread that will recieve messages from the server.
-// It will wait for a message to be recieved and then act upon it.
+// This function is run by the thread that will receive messages from the server.
+// It will wait for a message to be received and then act upon it.
 void message_receiver()
 {
 	// Largely taken from https://devarea.com/linux-handling-signals-in-a-multithreaded-application/
 	// This will make this thread ignore SIGINT calls and have the other thread take care of them.
 	sigset_t mask;
 	sigemptyset(&mask);
-        sigaddset(&mask, SIGINT);
+	sigaddset(&mask, SIGINT);
 	pthread_sigmask(SIG_BLOCK, &mask, NULL);
 	// Attach our closing handler to SIGUSR1
 	signal(SIGUSR1, close_thread);
@@ -95,17 +94,17 @@ void message_receiver()
 		}
 
 		// Wait for a new message from the server
-		read_size = read(client_socket_fd, header.data(), header.size());
+		read_size =
+			read(client_socket_fd, header.data(), header.size());
 		// Check if other thread is still running
 		if (!is_running) {
 			std::cout << "Running" << std::endl;
 			return;
 		}
-		
+
 		// Check if socket is dead
 		if (read_size == 0) {
-			std::cerr << "Socket is closed."
-				  << std::endl;
+			std::cerr << "Socket is closed." << std::endl;
 			is_running = false;
 			return;
 		}
@@ -128,7 +127,7 @@ void message_receiver()
 		}
 
 		// Create a vector to hold the second data package if needed
-		std::vector<uint8_t> data_package (ml.get_data_packet_length()); 
+		std::vector<uint8_t> data_package(ml.get_data_packet_length());
 
 		// What type of message is it? And how to handle it.
 		switch (ml.get_message_type()) {
@@ -139,105 +138,128 @@ void message_receiver()
 		// Message Type - Error
 		case 1:
 			// Wait for a new message from the server
-			read_size = read(client_socket_fd, data_package.data(), data_package.size());
-			
+			read_size = read(client_socket_fd, data_package.data(),
+					 data_package.size());
+
 			// Check if other thread is still running
 			if (!is_running) {
 				return;
 			}
-			
+
 			// Check if socket is dead
 			if (read_size == 0) {
-				std::cerr << "Socket is closed."
-					<< std::endl;
+				std::cerr << "Socket is closed." << std::endl;
 				is_running = false;
 				return;
 			}
 
 			// Check if size is correct
-			else if (read_size < (ssize_t)ml.get_data_packet_length()) {
-				std::cerr << "Unable to read the right amount of data."
+			else if (read_size <
+				 (ssize_t)ml.get_data_packet_length()) {
+				std::cerr
+					<< "Unable to read the right amount of data."
 					<< std::endl;
 				continue;
 			}
 
-			// Put the error message to console.				
-			std::cout << "Error - " << 
-				build_string_safe((char *)data_package.data(), ml.get_data_packet_length())  << std::endl;  
-			
+			// Put the error message to console.
+			std::cout << "Error - "
+				  << build_string_safe(
+					     (char *)data_package.data(),
+					     ml.get_data_packet_length())
+				  << std::endl;
+
 			break;
-		
+
 		// Message Type - Who
 		case 2:
 			// Wait for a new message from the server
-			read_size = read(client_socket_fd, data_package.data(), data_package.size());
-			
+			read_size = read(client_socket_fd, data_package.data(),
+					 data_package.size());
+
 			// Check if other thread is still running
 			if (!is_running) {
 				return;
 			}
-			
+
 			// Check if socket is dead
 			if (read_size == 0) {
-				std::cerr << "Socket is closed."
-					<< std::endl;
+				std::cerr << "Socket is closed." << std::endl;
 				is_running = false;
 				return;
 			}
 
 			// Check if size is correct
-			else if (read_size < (ssize_t)ml.get_data_packet_length()) {
-				std::cerr << "Unable to read the right amount of data."
+			else if (read_size <
+				 (ssize_t)ml.get_data_packet_length()) {
+				std::cerr
+					<< "Unable to read the right amount of data."
 					<< std::endl;
 				continue;
 			}
 
-			// Put the message to console.				
-			std::cout << "Users - " << 
-				build_string_safe((char *)data_package.data(), ml.get_data_packet_length())  << std::endl;  
-			
+			// Put the message to console.
+			std::cout << "Users - "
+				  << build_string_safe(
+					     (char *)data_package.data(),
+					     ml.get_data_packet_length())
+				  << std::endl;
+
 			break;
-		
+
 		// Message Type - Message Acknowledge
 		case 3:
 			break;
 		// Message Type - Message
 		case 4:
 			// Wait for a new message from the server
-			read_size = read(client_socket_fd, data_package.data(), data_package.size());
-			
+			read_size = read(client_socket_fd, data_package.data(),
+					 data_package.size());
+
 			// Check if other thread is still running
 			if (!is_running) {
 				return;
 			}
-			
+
 			// Check if socket is dead
 			if (read_size == 0) {
-				std::cerr << "Socket is closed."
-					<< std::endl;
+				std::cerr << "Socket is closed." << std::endl;
 				is_running = false;
 				return;
 			}
 
 			// Check if size is correct
-			else if (read_size < (ssize_t)ml.get_data_packet_length()) {
-				std::cerr << "Unable to read the right amount of data."
+			else if (read_size <
+				 (ssize_t)ml.get_data_packet_length()) {
+				std::cerr
+					<< "Unable to read the right amount of data."
 					<< std::endl;
 				continue;
 			}
 
 			if (ml.get_dest_username() == "all")
-				std::cout << "(Room) " << ml.get_source_username() << " says > " <<
-					build_string_safe((char *)data_package.data(), ml.get_data_packet_length())  << std::endl;  
+				std::cout
+					<< "(Room) " << ml.get_source_username()
+					<< " says > "
+					<< build_string_safe(
+						   (char *)data_package.data(),
+						   ml.get_data_packet_length())
+					<< std::endl;
 			else
-				std::cout <<  ml.get_source_username() << " whispers to you > " << 
-					build_string_safe((char *)data_package.data(), ml.get_data_packet_length())  << std::endl;  
-			
+				std::cout
+					<< ml.get_source_username()
+					<< " whispers to you > "
+					<< build_string_safe(
+						   (char *)data_package.data(),
+						   ml.get_data_packet_length())
+					<< std::endl;
+
 			break;
 
 		// Message Type - Disconnect
 		case 5:
-			std::cout << "Server has disconnected you." << std::endl;
+			std::cout << "Server has disconnected you."
+				  << std::endl;
 			is_running = false;
 			return;
 			break;
@@ -253,8 +275,7 @@ void console_help()
 {
 	std::cout << "Help" << std::endl;
 	std::cout << "====" << std::endl;
-	std::cout << "help                      - this message"
-		  << std::endl;
+	std::cout << "help                      - this message" << std::endl;
 	std::cout
 		<< "message <username> <message>  - send a message to username"
 		<< std::endl;
@@ -288,7 +309,7 @@ void message_sender()
 
 	// Create message header for login
 	MessageLayer header_1;
-	MessageHeader &header = header_1.set_packet_number(packet_number+1)
+	MessageHeader &header = header_1.set_packet_number(packet_number + 1)
 					.set_version_number(VERSION)
 					.set_source_username(username)
 					.set_dest_username("server")
@@ -299,24 +320,25 @@ void message_sender()
 	// Update the packet number
 	packet_number++;
 	// Send the message to the server. With no flags. Check to make sure sent.
-	if (send(client_socket_fd, (void *)(header.data()), header.size(), 0) == -1) {
-		std::cerr << "Failure to send login through socket" << std::endl;
-		// Cleanup and exit		
-		cleanup_on_exit(EXIT_FAILURE); 
+	if (send(client_socket_fd, (void *)(header.data()), header.size(), 0) ==
+	    -1) {
+		std::cerr << "Failure to send login through socket"
+			  << std::endl;
+		// Cleanup and exit
+		cleanup_on_exit(EXIT_FAILURE);
 	}
 
 	// Display the instructions for input.
 	console_help();
 
 	// Flush the \n from cin
-    std::cin.ignore();	
-	
+	std::cin.ignore();
+
 	// Loop for user input
 	while (true) {
-
 		// Get user input
 		std::cout << ">";
-        getline(std::cin, input);
+		getline(std::cin, input);
 
 		// Check if read thread still exists
 		if (!is_running) {
@@ -326,70 +348,84 @@ void message_sender()
 
 		// Find the first space
 		position = input.find(" ");
-		
+
 		// If size is less than 3, its not a valid command.
 		if (input.size() < 3) {
-			std::cout << "That is not a proper command. Type 'help' for options." << std::endl;
+			std::cout
+				<< "That is not a proper command. Type 'help' for options."
+				<< std::endl;
 			continue;
 		}
 
 		// Command contains no " ", so must be 'who' 'exit' 'help' or invalid.
-		if (position==std::string::npos) {
+		if (position == std::string::npos) {
 			// Check if its 'who'
 			if (input.compare(0, 3, "who") == 0) {
 				// Create a who packet
-				MessageHeader &header = header_1.set_packet_number(packet_number)
-					.set_version_number(VERSION)
-					.set_source_username(username)
-					.set_dest_username("server")
-					.set_message_type(2)
-					.set_data_packet_length(0)
-					.build();
+				MessageHeader &header =
+					header_1.set_packet_number(
+							packet_number)
+						.set_version_number(VERSION)
+						.set_source_username(username)
+						.set_dest_username("server")
+						.set_message_type(2)
+						.set_data_packet_length(0)
+						.build();
 
 				// Update the packet number
 				packet_number++;
 
 				// Send the message to the server. With no flags. Check to make sure sent.
-				if (send(client_socket_fd, (void *)(header.data()), header.size(), 0) == -1) {
-					// Cleanup and exit		
-					cleanup_on_exit(EXIT_FAILURE); 
+				if (send(client_socket_fd,
+					 (void *)(header.data()), header.size(),
+					 0) == -1) {
+					// Cleanup and exit
+					cleanup_on_exit(EXIT_FAILURE);
 				}
-					
+
 				// Iterate and get next input
 				continue;
 			}
 			// Check if its 'exit'
-			else if (input.size() > 3  && (input.compare(0, 4, "exit") == 0)) {
+			else if (input.size() > 3 &&
+				 (input.compare(0, 4, "exit") == 0)) {
 				// Create a bye packet
 
-				MessageHeader &header = header_1.set_packet_number(packet_number)
-					.set_version_number(VERSION)
-					.set_source_username(username)
-					.set_dest_username("server")
-					.set_message_type(5)
-					.set_data_packet_length(0)
-					.build();
-				
+				MessageHeader &header =
+					header_1.set_packet_number(
+							packet_number)
+						.set_version_number(VERSION)
+						.set_source_username(username)
+						.set_dest_username("server")
+						.set_message_type(5)
+						.set_data_packet_length(0)
+						.build();
+
 				// Update the packet number
 				packet_number++;
 
 				// Send the message to the server. With no flags. Check to make sure sent.
-				if (send(client_socket_fd, (void *)(header.data()), header.size(), 0) == -1) {
-					// Cleanup and exit		
-					cleanup_on_exit(EXIT_FAILURE); 
+				if (send(client_socket_fd,
+					 (void *)(header.data()), header.size(),
+					 0) == -1) {
+					// Cleanup and exit
+					cleanup_on_exit(EXIT_FAILURE);
 				}
-				is_running = false;		
+				is_running = false;
 				// Clean and kill both threads
 				cleanup_on_exit(0);
 			}
 			// Check if its 'help'
-			else if (input.size() > 3  && (input.compare(0, 4, "help") == 0)) {
+			else if (input.size() > 3 &&
+				 (input.compare(0, 4, "help") == 0)) {
 				console_help();
 				continue;
 			}
 			// Must be invalid then
 			else {
-				std::cout << "That is not a proper command. Type 'help' for options." << std::endl;
+				std::cout
+					<< "That is not a proper command. Type 'help' for options."
+					<< std::endl;
 				continue;
 			}
 		}
@@ -397,87 +433,112 @@ void message_sender()
 		else if (input.compare(0, position, "message") == 0) {
 			// If the string isn't big enough, must not have included a recipient
 			if (input.size() < 8) {
-				std::cout << "You specify the recipient. Type 'help' for options." << std::endl;
+				std::cout
+					<< "You specify the recipient. Type 'help' for options."
+					<< std::endl;
 				continue;
 			}
 			// Find the second space (the one after username)
 			position2 = input.find(" ", 8);
 			// If string isn't big enough to have a message or no second space
-			if (position==std::string::npos || (input.size() < (position2+1))) {
-				std::cout << "You did not specify a message. Type 'help' for options." << std::endl;
+			if (position == std::string::npos ||
+			    (input.size() < (position2 + 1))) {
+				std::cout
+					<< "You did not specify a message. Type 'help' for options."
+					<< std::endl;
 				continue;
 			}
 			// Check if the recipient was 'all'
-			else if (input.compare(8, position2-position-1, "all") == 0) {
-				message = input.substr(position2+1, std::string::npos);
+			else if (input.compare(8, position2 - position - 1,
+					       "all") == 0) {
+				message = input.substr(position2 + 1,
+						       std::string::npos);
 
 				// Create an all message
-				MessageHeader &header = header_1.set_packet_number(packet_number)
-					.set_version_number(VERSION)
-					.set_source_username(username)
-					.set_dest_username("all")
-					.set_message_type(4)
-					.set_data_packet_length(message.length()+1)
-					.build();
-				
+				MessageHeader &header =
+					header_1.set_packet_number(
+							packet_number)
+						.set_version_number(VERSION)
+						.set_source_username(username)
+						.set_dest_username("all")
+						.set_message_type(4)
+						.set_data_packet_length(
+							message.length() + 1)
+						.build();
+
 				// Update the packet number
 				packet_number++;
 
 				// Send the header to the server. With no flags. Check to make sure sent.
-				if (send(client_socket_fd, (void *)(header.data()), header.size(), 0) == -1) {
-					// Cleanup and exit		
-					cleanup_on_exit(EXIT_FAILURE);  
-				}
-				
-				// Send the data to the server. With no flags. Check to make sure sent.
-				if (send(client_socket_fd, (void *)(message.c_str()), message.length()+1, 0) == -1) {
-					// Cleanup and exit		
-					cleanup_on_exit(EXIT_FAILURE); 				
+				if (send(client_socket_fd,
+					 (void *)(header.data()), header.size(),
+					 0) == -1) {
+					// Cleanup and exit
+					cleanup_on_exit(EXIT_FAILURE);
 				}
 
-				// Sent, so iterate to the next user command. 
+				// Send the data to the server. With no flags. Check to make sure sent.
+				if (send(client_socket_fd,
+					 (void *)(message.c_str()),
+					 message.length() + 1, 0) == -1) {
+					// Cleanup and exit
+					cleanup_on_exit(EXIT_FAILURE);
+				}
+
+				// Sent, so iterate to the next user command.
 				continue;
 			}
 			// Otherwise must be a personal message
 			else {
-				recipient = input.substr(8,  (position2-8));
-				message = input.substr(position2+1, std::string::npos);
-				
+				recipient = input.substr(8, (position2 - 8));
+				message = input.substr(position2 + 1,
+						       std::string::npos);
+
 				// Create an personal message
-				MessageHeader &header = header_1.set_packet_number(packet_number)
-					.set_version_number(VERSION)
-					.set_source_username(username)
-					.set_dest_username(recipient)
-					.set_message_type(4)
-					.set_data_packet_length(message.length()+1)
-					.build();
-				
+				MessageHeader &header =
+					header_1.set_packet_number(
+							packet_number)
+						.set_version_number(VERSION)
+						.set_source_username(username)
+						.set_dest_username(recipient)
+						.set_message_type(4)
+						.set_data_packet_length(
+							message.length() + 1)
+						.build();
+
 				// Update the packet number
 				packet_number++;
 
 				// Send the header to the server. With no flags. Check to make sure sent.
-				if (send(client_socket_fd, (void *)(header.data()), header.size(), 0) == -1) {
-					// Cleanup and exit		
-					cleanup_on_exit(EXIT_FAILURE);  
-				}
-				
-				// Send the data to the server. With no flags. Check to make sure sent.
-				if (send(client_socket_fd, (void *)(message.c_str()), message.length()+1, 0) == -1) {
-					std::cerr << "Failure to send personal message data through socket" << std::endl;
-					// Cleanup and exit		
-					cleanup_on_exit(EXIT_FAILURE); 
+				if (send(client_socket_fd,
+					 (void *)(header.data()), header.size(),
+					 0) == -1) {
+					// Cleanup and exit
+					cleanup_on_exit(EXIT_FAILURE);
 				}
 
-				// Sent, so iterate to the next user command. 
+				// Send the data to the server. With no flags. Check to make sure sent.
+				if (send(client_socket_fd,
+					 (void *)(message.c_str()),
+					 message.length() + 1, 0) == -1) {
+					std::cerr
+						<< "Failure to send personal message data through socket"
+						<< std::endl;
+					// Cleanup and exit
+					cleanup_on_exit(EXIT_FAILURE);
+				}
+
+				// Sent, so iterate to the next user command.
 				continue;
 			}
 		}
 		// Contains a space but the command is not message. Must not be proper
 		else {
-			std::cout << "That is not a proper command. Type 'help' for options." << std::endl;
-			continue;	
+			std::cout
+				<< "That is not a proper command. Type 'help' for options."
+				<< std::endl;
+			continue;
 		}
-
 	}
 }
 
@@ -512,7 +573,6 @@ int main(void)
 		std::cerr << "Error could not connect to server." << std::endl;
 		exit(EXIT_FAILURE);
 	}
-
 
 	// Create a thread to receive
 	client_thread = std::thread(message_receiver);
