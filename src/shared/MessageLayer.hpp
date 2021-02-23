@@ -16,6 +16,10 @@ Creation: Please use the provided Make file that will make both the
 #include <string>
 #include <array>
 
+// From GitHub, MIT licenced
+// SHA256 hashing function
+#include "picosha2.hpp"
+
 // Maximum username length
 static const uint32_t constexpr username_len = 32;
 
@@ -32,10 +36,12 @@ static const uint32_t constexpr message_type_begin = 67;
 static const uint32_t constexpr message_type_end = 67;
 static const uint32_t constexpr data_packet_length_begin = 68;
 static const uint32_t constexpr data_packet_length_end = 69;
-static const uint32_t constexpr future_use_begin = 70;
+static const uint32_t constexpr data_packet_checksum_begin = 70;
+static const uint32_t constexpr data_packet_checksum_end = 101;
+static const uint32_t constexpr future_use_begin = 102;
 static const uint32_t constexpr future_use_end = 133;
-static const uint32_t constexpr sha256sum_begin = 134;
-static const uint32_t constexpr sha256sum_end = 165;
+static const uint32_t constexpr header_checksum_begin = 134;
+static const uint32_t constexpr header_checksum_end = 165;
 
 using MessageHeader = std::array<uint8_t, 166>;
 
@@ -43,16 +49,17 @@ class MessageLayer {
 	// Message header for communications between the client and server.
 	// 166 bytes
 	MessageHeader header;
-	// Checksum verifying the integrity of the header.
+	// Checksum container used for verifying the integrity of the
+	// header as well as the data packet.
 	std::array<uint8_t, 32> checksum;
 	// Calculate the checksum of the contents of the header,
 	// and write it to the 32 bytes (256 bits) that make up
 	// the checksum section of the header.
-	void calculate_sha256_sum(void);
+	void calculate_header_sum(void);
 	// Verify the checksum of the header's contents against
 	// the checksum stored in the header. If they aren't the same
 	// there is something amiss within the header.
-	bool verify_sha256_sum(void);
+	bool verify_header_sum(void);
 	// Internal function for setting usernames within
 	// the header
 	// Specific function, making sure the length is never longer than
@@ -78,7 +85,6 @@ class MessageLayer {
 	// own after this is executed, as it is now apart of this new
 	// MessageLayer.
 	MessageLayer(MessageHeader &&header_rvalue_ref);
-
 	// Return a reference to the internal header stored within this message
 	// layer. Very useful for reusing the same header over and over again.
 	MessageHeader &get_internal_header(void);
@@ -114,9 +120,32 @@ class MessageLayer {
 	// convert the passed short to network byte order
 	// and put it in it's place within the header.
 	MessageLayer &set_data_packet_length(uint16_t data_packet_len);
-
-	// Additional stuff to be added for future use here
-
+	// Calculate the checksum of the data packet, and store it in
+	// the appropriate place in the header
+	// The +1's are because C++ iterators are exclusive
+	template <typename T>
+	void calculate_data_packet_checksum(const T &data_packet_container)
+	{
+		picosha2::hash256(data_packet_container.begin(),
+				  data_packet_container.end(),
+				  header.begin() + data_packet_checksum_begin,
+				  header.begin() +
+					  (data_packet_checksum_end + 1));
+	}
+	// Hash the passed data packet container and compare it to the checksum
+	// stored within the header.
+	template <typename T>
+	bool verify_data_packet_checksum(const T &data_packet_container)
+	{
+		picosha2::hash256(data_packet_container.begin(),
+				  data_packet_container.end(), checksum.begin(),
+				  checksum.end());
+		// Make sure the checksums match
+		return std::equal(header.begin() + data_packet_checksum_begin,
+				  header.begin() +
+					  (data_packet_checksum_end + 1),
+				  checksum.begin());
+	}
 	// calculate the checksum for the header, and return a reference to
 	// the internal header of the MessageLayer.
 	// (last function called in builder pattern when setting the attributes)

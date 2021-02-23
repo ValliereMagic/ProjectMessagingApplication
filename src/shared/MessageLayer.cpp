@@ -19,30 +19,28 @@ extern "C" {
 }
 #include "MessageLayer.hpp"
 
-// From GitHub, MIT licenced
-// SHA256 hashing function
-#include "picosha2.hpp"
-
 // Calculate the checksum of the contents of the header,
 // and write it to the 32 bytes (256 bits) that make up
 // the checksum section of the header.
-void MessageLayer::calculate_sha256_sum(void)
+void MessageLayer::calculate_header_sum(void)
 {
-	picosha2::hash256(header.begin(), header.begin() + sha256sum_begin,
-			  header.begin() + sha256sum_begin, header.end());
+	picosha2::hash256(header.begin(),
+			  header.begin() + header_checksum_begin,
+			  header.begin() + header_checksum_begin, header.end());
 }
 
 // Verify the checksum of the header's contents against
 // the checksum stored in the header. If they aren't the same
 // there is something amiss within the header.
-bool MessageLayer::verify_sha256_sum(void)
+bool MessageLayer::verify_header_sum(void)
 {
 	// Hash the content of the header, and place it in the checksum buffer
 	// to check whether it is valid.
-	picosha2::hash256(header.begin(), header.begin() + sha256sum_begin,
+	picosha2::hash256(header.begin(),
+			  header.begin() + header_checksum_begin,
 			  checksum.begin(), checksum.end());
 	// Make sure the checksums match
-	return std::equal(header.begin() + sha256sum_begin, header.end(),
+	return std::equal(header.begin() + header_checksum_begin, header.end(),
 			  checksum.begin());
 }
 
@@ -69,7 +67,7 @@ MessageLayer::MessageLayer(MessageHeader &header_ref)
 	// Copy over what's been passed.
 	header = header_ref;
 	// Make sure that the checksum is valid.
-	valid = verify_sha256_sum();
+	valid = verify_header_sum();
 }
 
 // Constructor that takes ownership of the passed MessageHeader.
@@ -79,7 +77,7 @@ MessageLayer::MessageLayer(MessageHeader &header_ref)
 MessageLayer::MessageLayer(MessageHeader &&header_rvalue_ref)
 	: header(std::move(header_rvalue_ref))
 {
-	valid = verify_sha256_sum();
+	valid = verify_header_sum();
 }
 
 // Return a reference to the internal header stored within this message
@@ -93,7 +91,7 @@ MessageHeader &MessageLayer::get_internal_header(void)
 // reuse of the MessageLayer.
 void MessageLayer::verify_checksum(void)
 {
-	valid = verify_sha256_sum();
+	valid = verify_header_sum();
 }
 
 // Retrieve the first 2 bytes from the header
@@ -215,7 +213,7 @@ MessageLayer &MessageLayer::set_data_packet_length(uint16_t data_packet_len)
 // (last function called in builder pattern when setting the attributes)
 MessageHeader &MessageLayer::build(void)
 {
-	calculate_sha256_sum();
+	calculate_header_sum();
 	return header;
 }
 
@@ -224,7 +222,7 @@ MessageHeader &MessageLayer::build(void)
 // (last function called in builder pattern when setting the attributes)
 MessageHeader MessageLayer::build_cpy(void)
 {
-	calculate_sha256_sum();
+	calculate_header_sum();
 	MessageHeader cpy = header;
 	return cpy;
 }
