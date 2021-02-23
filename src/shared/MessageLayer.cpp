@@ -28,8 +28,8 @@ extern "C" {
 // the checksum section of the header.
 void MessageLayer::calculate_sha256_sum(void)
 {
-	picosha2::hash256(header.begin(), header.begin() + 134,
-			  header.begin() + 134, header.end());
+	picosha2::hash256(header.begin(), header.begin() + sha256sum_begin,
+			  header.begin() + sha256sum_begin, header.end());
 }
 
 // Verify the checksum of the header's contents against
@@ -39,10 +39,11 @@ bool MessageLayer::verify_sha256_sum(void)
 {
 	// Hash the content of the header, and place it in the checksum buffer
 	// to check whether it is valid.
-	picosha2::hash256(header.begin(), header.begin() + 134,
+	picosha2::hash256(header.begin(), header.begin() + sha256sum_begin,
 			  checksum.begin(), checksum.end());
 	// Make sure the checksums match
-	return std::equal(header.begin() + 134, header.end(), checksum.begin());
+	return std::equal(header.begin() + sha256sum_begin, header.end(),
+			  checksum.begin());
 }
 
 // Build a brand-new squeaky clean MessageLayer.
@@ -99,25 +100,25 @@ void MessageLayer::verify_checksum(void)
 // and convert them to host format and return
 uint16_t MessageLayer::get_packet_number(void)
 {
-	return ntohs(*((uint16_t *)&(header[0])));
+	return ntohs(*((uint16_t *)&(header[packet_number_begin])));
 }
 
 // Convert the passed short to network byte order,
 // and assign it to its place in the header.
 MessageLayer &MessageLayer::set_packet_number(uint16_t p_num)
 {
-	(*((uint16_t *)&(header[0]))) = htons(p_num);
+	(*((uint16_t *)&(header[packet_number_begin]))) = htons(p_num);
 	return (*this);
 }
 
 uint8_t MessageLayer::get_version_number(void)
 {
-	return header[2];
+	return header[header_version_begin];
 }
 
 MessageLayer &MessageLayer::set_version_number(uint8_t v_num)
 {
-	header[2] = v_num;
+	header[header_version_begin] = v_num;
 	return (*this);
 }
 
@@ -129,12 +130,13 @@ void MessageLayer::set_username(const std::string &source_username,
 				char *header_ptr)
 {
 	size_t min;
-	if (source_username.length() < 31)
+	// minus 1 is to make room for the null terminator
+	if (source_username.length() < (username_len - 1))
 		min = source_username.length();
 	else
-		min = 31;
+		min = (username_len - 1);
 	// Clear the entire username field of the header
-	std::memset(header_ptr, 0, 32);
+	std::memset(header_ptr, 0, username_len);
 	// Put the source_username at the beginning of the
 	// field in the header.
 	std::memcpy(header_ptr, (source_username.c_str()), min);
@@ -146,8 +148,8 @@ void MessageLayer::set_username(const std::string &source_username,
 // and pull the correct number of bytes (up to 32)
 std::string MessageLayer::get_source_username(void)
 {
-	char *username = (char *)&(header[3]);
-	return build_string_safe(username, 32);
+	char *username = (char *)&(header[source_username_begin]);
+	return build_string_safe(username, username_len);
 }
 
 // Copy passed string into the message header, and
@@ -155,7 +157,7 @@ std::string MessageLayer::get_source_username(void)
 MessageLayer &
 MessageLayer::set_source_username(const std::string &source_username)
 {
-	char *username = (char *)&(header[3]);
+	char *username = (char *)&(header[source_username_begin]);
 	this->set_username(source_username, username);
 	return (*this);
 }
@@ -164,8 +166,8 @@ MessageLayer::set_source_username(const std::string &source_username)
 // and pull the correct number of bytes (up to 32)
 std::string MessageLayer::get_dest_username(void)
 {
-	char *username = (char *)&(header[35]);
-	return build_string_safe(username, 32);
+	char *username = (char *)&(header[dest_username_begin]);
+	return build_string_safe(username, username_len);
 }
 
 // Copy passed string into the message header, and
@@ -173,7 +175,7 @@ std::string MessageLayer::get_dest_username(void)
 MessageLayer &
 MessageLayer::set_dest_username(const std::string &source_username)
 {
-	char *username = (char *)&(header[35]);
+	char *username = (char *)&(header[dest_username_begin]);
 	this->set_username(source_username, username);
 	return (*this);
 }
@@ -185,7 +187,7 @@ uint8_t MessageLayer::get_message_type(void)
 
 MessageLayer &MessageLayer::set_message_type(uint8_t m_type)
 {
-	header[67] = m_type;
+	header[message_type_begin] = m_type;
 	return (*this);
 }
 
@@ -194,7 +196,7 @@ MessageLayer &MessageLayer::set_message_type(uint8_t m_type)
 // and convert them to host format and return
 uint16_t MessageLayer::get_data_packet_length(void)
 {
-	return ntohs(*((uint16_t *)&(header[68])));
+	return ntohs(*((uint16_t *)&(header[data_packet_length_begin])));
 }
 
 // convert the passed short to network byte order
@@ -203,7 +205,8 @@ MessageLayer &MessageLayer::set_data_packet_length(uint16_t data_packet_len)
 {
 	// Convert the passed short to network byte order,
 	// and assign it to its place in the header.
-	(*((uint16_t *)&(header[68]))) = htons(data_packet_len);
+	(*((uint16_t *)&(header[data_packet_length_begin]))) =
+		htons(data_packet_len);
 	return (*this);
 }
 
