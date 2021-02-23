@@ -16,6 +16,27 @@ Creation: Please use the provided Make file that will make both the
 #include <string>
 #include <array>
 
+// Maximum username length
+static const uint32_t constexpr username_len = 32;
+
+// Header indicies
+static const uint32_t constexpr packet_number_begin = 0;
+static const uint32_t constexpr packet_number_end = 1;
+static const uint32_t constexpr header_version_begin = 2;
+static const uint32_t constexpr header_version_end = 2;
+static const uint32_t constexpr source_username_begin = 3;
+static const uint32_t constexpr source_username_end = 34;
+static const uint32_t constexpr dest_username_begin = 35;
+static const uint32_t constexpr dest_username_end = 66;
+static const uint32_t constexpr message_type_begin = 67;
+static const uint32_t constexpr message_type_end = 67;
+static const uint32_t constexpr data_packet_length_begin = 68;
+static const uint32_t constexpr data_packet_length_end = 69;
+static const uint32_t constexpr future_use_begin = 70;
+static const uint32_t constexpr future_use_end = 133;
+static const uint32_t constexpr sha256sum_begin = 134;
+static const uint32_t constexpr sha256sum_end = 165;
+
 using MessageHeader = std::array<uint8_t, 166>;
 
 class MessageLayer {
