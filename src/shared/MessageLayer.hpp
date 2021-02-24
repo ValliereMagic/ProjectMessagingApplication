@@ -20,6 +20,8 @@ Creation: Please use the provided Make file that will make both the
 // SHA256 hashing function
 #include "picosha2.hpp"
 
+// Message Type enumeration
+enum MessageTypes { LOGIN = 0, ERROR, WHO, ACK, MESSAGE, DISCONNECT, NACK };
 // Maximum username length
 static const uint32_t constexpr username_len = 32;
 
