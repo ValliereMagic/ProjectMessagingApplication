@@ -67,11 +67,12 @@ bool MessagingClient::send_error_message(const std::string &message)
 bool MessagingClient::send_verification_message(
 	const MessageTypes &type, const uint16_t &packet_number_recv)
 {
-	// Clear
-	ml.get_internal_header().fill(0);
+	// Make sepearate message layer, as to not overwrite the header
+	// of the message we are trying to verify
+	MessageLayer v_ml;
 	// Set message type and send
 	MessageHeader &header =
-		ml.set_message_type(type)
+		v_ml.set_message_type(type)
 			.set_version_number(MessagingClient::version)
 			.set_packet_number(packet_number_recv)
 			.set_dest_username(our_username)
@@ -224,7 +225,7 @@ void MessagingClient::client(void)
 			break;
 		}
 		// Disconnect Message
-		case MessageTypes::DISCONNECT:
+		case MessageTypes::DISCONNECT: {
 			std::string leave_message =
 				"User: " + our_username +
 				" disconnected from the room.\0";
@@ -245,6 +246,7 @@ void MessagingClient::client(void)
 			// and clean up this client.
 			return;
 			break;
+		}
 		}
 	}
 }
