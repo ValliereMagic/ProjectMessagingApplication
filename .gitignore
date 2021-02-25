@@ -3,3 +3,5 @@
 src/MessageLayerTests
 src/MessageServer
 src/MessageClient
+.cache
+compile_commands.json
