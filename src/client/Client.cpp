@@ -25,6 +25,7 @@ a shared header for transit.
 #include <cstring>
 #include <atomic>
 #include <mutex>
+#include <random>
 extern "C" {
 #include <unistd.h>
 #include <sys/socket.h>
@@ -345,6 +346,9 @@ void console_help()
 // server.
 void message_sender()
 {
+	// Set our random distributions.
+	std::random_device random_device("default");
+	std::uniform_int_distribution<int> message_messing_chance(1, 6);
 	signal(SIGUSR2, cleanup_on_exit);
 	std::string username;
 	std::string input;
@@ -555,7 +559,17 @@ void message_sender()
 				}
 			// Leave scope to remove the lock
 			}
-			
+
+			// 1/6 chance of message mockery
+			if (message_messing_chance(random_device) == 1) {
+				// Changing first letter of the message to 'a'
+				if (full_message.size() > 167) {
+					// Obviously won't produce an NAK if started with a anyways
+					full_message[166] = 'a';
+					std::cout << "First letter of Message changed to 'a' to test NACK" << std::endl;
+				}
+			}
+
 			// Send the vector to the server. With no flags. Check to make sure sent.
 			if (send(client_socket_fd, full_message.data(),
 				 full_message.size(), 0) == -1) {
