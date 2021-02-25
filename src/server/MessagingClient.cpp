@@ -48,7 +48,7 @@ bool MessagingClient::send_error_message(const std::string &message)
 	ml.get_internal_header().fill(0);
 	// Set the required header information
 	MessageHeader &header =
-		ml.set_message_type(1)
+		ml.set_message_type(MessageTypes::ERROR)
 			.set_version_number(MessagingClient::version)
 			.set_packet_number(
 				increment_packet_number(packet_number))
@@ -57,6 +57,25 @@ bool MessagingClient::send_error_message(const std::string &message)
 			.build();
 	auto message_to_send = build_message(header, message);
 	return send_to_client(our_username, message_to_send);
+}
+
+// Send verification message back to the client (ACK or NACK)
+bool MessagingClient::send_verification_message(
+	const MessageTypes &type, const uint16_t &packet_number_recv)
+{
+	// Clear
+	ml.get_internal_header().fill(0);
+	// Set message type and send
+	MessageHeader &header =
+		ml.set_message_type(type)
+			.set_version_number(MessagingClient::version)
+			.set_packet_number(packet_number_recv)
+			.set_dest_username(our_username)
+			.set_data_packet_length(0)
+			.build();
+	auto verification_message =
+		build_message<std::array<uint8_t, 0> >(header, {});
+	return send_to_client(our_username, verification_message);
 }
 
 // Main client loop, one for each connected client.
@@ -72,7 +91,7 @@ void MessagingClient::client(void)
 	// Header clear
 	header.fill(0);
 	// Fill out header and build.
-	ml.set_message_type(4)
+	ml.set_message_type(MessageTypes::MESSAGE)
 		.set_version_number(MessagingClient::version)
 		.set_packet_number(increment_packet_number(packet_number))
 		.set_source_username("server")
@@ -111,23 +130,23 @@ void MessagingClient::client(void)
 		std::vector<uint8_t> data_package(ml.get_data_packet_length());
 		switch (ml.get_message_type()) {
 		// Another login request? But you're logged in.
-		case 0: {
+		case MessageTypes::LOGIN: {
 			send_error_message("You already logged in, dingus.\0");
 			break;
 		}
 		// Client is sending me an error?
-		case 1: {
+		case MessageTypes::ERROR: {
 			continue;
 			break;
 		}
 		// Who message
-		case 2: {
+		case MessageTypes::WHO: {
 			// Special string with a null terminator in it
 			auto usernames = get_logged_in_users();
 			// Header clear
 			header.fill(0);
 			// Set the required header information
-			ml.set_message_type(2)
+			ml.set_message_type(MessageTypes::WHO)
 				.set_version_number(MessagingClient::version)
 				.set_packet_number(
 					increment_packet_number(packet_number))
@@ -141,17 +160,30 @@ void MessagingClient::client(void)
 				       build_message(header, usernames));
 			break;
 		}
-		// Message ACK (Not implemented until later assignments)
-		case 3: {
+		// Message ACK from client?
+		case MessageTypes::ACK: {
 			continue;
 			break;
 		}
 		// Actual Message or Broadcast
-		case 4: {
+		case MessageTypes::MESSAGE: {
 			// Read in the data portion of the header
 			ssize_t read_size =
 				read(client_socket, data_package.data(),
 				     data_package.size());
+			// verify the data packet checksum, and respond
+			// appropriately
+			if (!(ml.verify_data_packet_checksum(data_package))) {
+				std::cerr << "Received corrupted message from: "
+					  << our_username << ". Sending NACK."
+					  << std::endl;
+				send_verification_message(
+					MessageTypes::NACK,
+					ml.get_packet_number());
+				continue;
+			}
+			send_verification_message(MessageTypes::ACK,
+						  ml.get_packet_number());
 			// Check whether the socket had an error on read
 			if (read_size <= 0) {
 				std::cerr
@@ -188,14 +220,14 @@ void MessagingClient::client(void)
 			break;
 		}
 		// Disconnect Message
-		case 5:
+		case MessageTypes::DISCONNECT:
 			std::string leave_message =
 				"User: " + our_username +
 				" disconnected from the room.\0";
 			// Clear the header
 			header.fill(0);
 			// Set the header information
-			ml.set_message_type(4)
+			ml.set_message_type(MessageTypes::MESSAGE)
 				.set_version_number(MessagingClient::version)
 				.set_packet_number(
 					increment_packet_number(packet_number))
