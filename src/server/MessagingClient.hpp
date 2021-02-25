@@ -37,7 +37,7 @@ class MessagingClient {
 
     public:
 	// MessageHeader Version
-	static const int version = 1;
+	static const int version = 2;
 
 	MessagingClient(int client_socket, uint16_t packet_number,
 			const std::string &our_username, MessageLayer &&ml);
