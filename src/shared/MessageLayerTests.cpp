@@ -59,4 +59,6 @@ int main(void)
 	std::string message = "banana bread\0";
 	header_5.calculate_data_packet_checksum(message);
 	assert(header_5.verify_data_packet_checksum(message));
+	assert(!(header_5.verify_data_packet_checksum<std::string>(
+		"banana soup\0")));
 }

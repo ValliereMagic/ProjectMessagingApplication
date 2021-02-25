@@ -218,7 +218,7 @@ static void login_procedure(int client_socket)
 	MessageHeader login_response =
 		ml.set_version_number(MessagingClient::version)
 			.set_packet_number(login_packet_number)
-			.set_message_type(0)
+			.set_message_type(MessageTypes::LOGIN)
 			.set_dest_username(username)
 			.build_cpy();
 
@@ -268,7 +268,7 @@ static void login_procedure(int client_socket)
 		// Set the required header information
 		std::string error_message = "Invalid username to login with.\0";
 		MessageHeader &header =
-			ml.set_message_type(1)
+			ml.set_message_type(MessageTypes::ERROR)
 				.set_version_number(MessagingClient::version)
 				.set_packet_number(login_packet_number)
 				.set_dest_username(username)
