@@ -28,7 +28,8 @@ class MessagingClient {
 	// Send error messages to the client
 	bool send_error_message(const std::string &message);
 	// Send verification message back to the client (ACK or NACK)
-	bool send_verification_message(const MessageTypes &type);
+	bool send_verification_message(const MessageTypes &type,
+				       const uint16_t &packet_number_recv);
 
     public:
 	// MessageHeader Version

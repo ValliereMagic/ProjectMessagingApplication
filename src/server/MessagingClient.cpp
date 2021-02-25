@@ -60,7 +60,8 @@ bool MessagingClient::send_error_message(const std::string &message)
 }
 
 // Send verification message back to the client (ACK or NACK)
-bool MessagingClient::send_verification_message(const MessageTypes &type)
+bool MessagingClient::send_verification_message(
+	const MessageTypes &type, const uint16_t &packet_number_recv)
 {
 	// Clear
 	ml.get_internal_header().fill(0);
@@ -68,8 +69,7 @@ bool MessagingClient::send_verification_message(const MessageTypes &type)
 	MessageHeader &header =
 		ml.set_message_type(type)
 			.set_version_number(MessagingClient::version)
-			.set_packet_number(
-				increment_packet_number(packet_number))
+			.set_packet_number(packet_number_recv)
 			.set_dest_username(our_username)
 			.set_data_packet_length(0)
 			.build();
@@ -177,10 +177,13 @@ void MessagingClient::client(void)
 				std::cerr << "Received corrupted message from: "
 					  << our_username << ". Sending NACK."
 					  << std::endl;
-				send_verification_message(MessageTypes::NACK);
+				send_verification_message(
+					MessageTypes::NACK,
+					ml.get_packet_number());
 				continue;
 			}
-			send_verification_message(MessageTypes::ACK);
+			send_verification_message(MessageTypes::ACK,
+						  ml.get_packet_number());
 			// Check whether the socket had an error on read
 			if (read_size <= 0) {
 				std::cerr
