@@ -14,7 +14,6 @@ Requires the shared MessageLayer Class that is used in to create
 a shared header for transit.
 ----------------------------------------------------------------------*/
 
-#include "MessageLayer.hpp"
 #include <iostream>
 #include "Server.hpp"
 #include "MessagingClient.hpp"
