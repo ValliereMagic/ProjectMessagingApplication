@@ -20,22 +20,12 @@ a shared header for transit.
 #include <iostream>
 #include <thread>
 #include <csignal>
-#include <unordered_map>
-#include <sstream>
 extern "C" {
 #include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
-#include <pthread.h>
 }
-#include "MessagingClient.hpp"
+#include "SharedClients.hpp"
 
-// client_objects map accessable from all client threads
-// Thread safe access from the functions implemented in this file
-// using posix rw_locks.
-static pthread_rwlock_t client_objects_lock;
-static std::unordered_map<std::string, MessagingClient> client_objects;
 // The server socket file descriptor. Global to this translation unit
 // so that the cleanup signal handler can close it.
 static int server_socket_fd;
@@ -44,119 +34,9 @@ static int server_socket_fd;
 // and destroy the rwlock.
 void cleanup_on_exit(int signum)
 {
-	// destroy the rwlock
-	pthread_rwlock_destroy(&client_objects_lock);
 	// Close the server socket
 	close(server_socket_fd);
 	exit(signum);
-}
-
-// Send a message to all connected clients except for ourselves.
-// Using the passed username field to omit ourselves.
-// (return false if we weren't able to send the message to one
-// of the clients.)
-bool send_to_all(const std::string &our_username,
-		 const std::vector<uint8_t> &message)
-{
-	// Open the lock for reading
-	if (pthread_rwlock_rdlock(&client_objects_lock) != 0) {
-		std::cerr << "Unable to lock the rwlock for reading."
-			  << std::endl;
-		exit(EXIT_FAILURE);
-	}
-	bool send_success = true;
-	// Send the message to each client
-	for (auto &user : client_objects) {
-		// Don't send it to ourselves
-		if (user.first != our_username) {
-			int client_fd = (user.second).get_client_socket();
-			// Send the message
-			if (send(client_fd, message.data(), message.size(), 0) <
-			    (ssize_t)message.size()) {
-				std::cerr
-					<< "Unable to send a message to a client socket."
-					<< std::endl;
-				send_success = false;
-			}
-		}
-	}
-	// Close the lock for reading
-	if (pthread_rwlock_unlock(&client_objects_lock) != 0) {
-		std::cerr << "Unable to unlock the rwlock after reading."
-			  << std::endl;
-		exit(EXIT_FAILURE);
-	}
-	return send_success;
-}
-
-// Send a message to another client by username
-// return false if we weren't able to send it to the recipient
-// (if they don't exist.)
-bool send_to_client(const std::string &username,
-		    const std::vector<uint8_t> &message)
-{
-	// Open the lock for reading
-	if (pthread_rwlock_rdlock(&client_objects_lock) != 0) {
-		std::cerr << "Unable to lock the rwlock for reading."
-			  << std::endl;
-		exit(EXIT_FAILURE);
-	}
-
-	// Check if the user exists. If it does,
-	// send them the message.
-	auto client_fd_it = client_objects.find(username);
-	bool send_success = true;
-	if (client_fd_it != client_objects.end()) {
-		// get the file discriptor for the client we are sending
-		// a message to.
-		int client_fd = (client_fd_it->second).get_client_socket();
-		// Send the message
-		if (send(client_fd, message.data(), message.size(), 0) <
-		    (ssize_t)message.size()) {
-			std::cerr
-				<< "Unable to send a message to a client socket."
-				<< std::endl;
-			send_success = false;
-		}
-	} else {
-		send_success = false;
-	}
-
-	// Close the lock for reading
-	if (pthread_rwlock_unlock(&client_objects_lock) != 0) {
-		std::cerr << "Unable to unlock the rwlock after reading."
-			  << std::endl;
-		exit(EXIT_FAILURE);
-	}
-	return send_success;
-}
-
-// Get CSV list of logged in users from the client_objects
-// hash map.
-std::string get_logged_in_users(void)
-{
-	// String stream to build the CSV message within
-	std::stringstream usernames;
-	// Open the lock for reading
-	if (pthread_rwlock_rdlock(&client_objects_lock) != 0) {
-		std::cerr << "Unable to lock the rwlock for reading."
-			  << std::endl;
-		exit(EXIT_FAILURE);
-	}
-	// Add all the usernames to CSV string
-	for (auto &user : client_objects) {
-		usernames << user.first << ", ";
-	}
-	// add null terminator
-	usernames << '\0';
-	// Close the lock for reading
-	if (pthread_rwlock_unlock(&client_objects_lock) != 0) {
-		std::cerr << "Unable to unlock the rwlock after reading."
-			  << std::endl;
-		exit(EXIT_FAILURE);
-	}
-	// Turn the stream into a string and return it.
-	return usernames.str();
 }
 
 // Increment and overflow packet numbers in a defined way.
@@ -221,44 +101,17 @@ static void login_procedure(int client_socket)
 			.set_message_type(MessageTypes::LOGIN)
 			.set_dest_username(username)
 			.build_cpy();
-
-	// Create a MessagingClient, and try to insert it into the shared
-	// HashMap.
-	bool user_duplicate = false;
-	MessagingClient *messaging_client = nullptr;
-	// Lock the wrlock for writing, allowing us to add this new user
-	// to the system.
-	if (pthread_rwlock_wrlock(&client_objects_lock) != 0) {
-		std::cerr << "Unable to lock the rwlock for writing."
-			  << std::endl;
-		exit(EXIT_FAILURE);
-	}
-	// See if the username is already active
-	if (client_objects.find(username) != client_objects.end()) {
-		user_duplicate = true;
-	} else {
-		client_objects.insert(std::make_pair(
-			username,
-			MessagingClient(client_socket, login_packet_number,
-					username, std::move(ml))));
-		// variable 'ml' no longer valid after move, if this branch
-		// was executed.
-		// Cannot copy a client object. Only reference it and move it.
-		// It is owned by client_objects, and we are now borrowing it.
-		messaging_client = &(client_objects.at(username));
-	}
-	// Unlock the rwlock, we are done writing now.
-	if (pthread_rwlock_unlock(&client_objects_lock) != 0) {
-		std::cerr << "Unable to unlock the rwlock after writing."
-			  << std::endl;
-		exit(EXIT_FAILURE);
-	}
+	// Get the instance of SharedClients (Singleton)
+	SharedClients &sc = SharedClients::get_instance();
+	// Add the user to the system
+	MessagingClient *messaging_client = sc.add_new_user(
+		username, client_socket, login_packet_number, std::move(ml));
 	// Make sure we didn't find a duplicate username while
 	// we were within the write lock:
 	// if this statement is entered, it means that ml wasn't moved
 	// into messaging_client, and we can use it in here to send
 	// the error message to the client.
-	if (messaging_client == nullptr || user_duplicate == true) {
+	if (messaging_client == nullptr) {
 		std::cerr << "Client: " << username << " already exists."
 			  << std::endl;
 		// The user was unable to get logged in due to their
@@ -303,21 +156,8 @@ static void login_procedure(int client_socket)
 	messaging_client->client();
 	// When we return to here, it means we are done with the
 	// connection to this client.
-	// Lock the client_objects hashmap, to remove this exiting
-	// client from the system.
-	if (pthread_rwlock_wrlock(&client_objects_lock) != 0) {
-		std::cerr << "Unable to lock the rwlock for writing."
-			  << std::endl;
-		exit(EXIT_FAILURE);
-	}
-	// Remove and destruct the object for this client.
-	client_objects.erase(username);
-	// Were done writing now, unlock the write lock.
-	if (pthread_rwlock_unlock(&client_objects_lock) != 0) {
-		std::cerr << "Unable to unlock the rwlock after writing."
-			  << std::endl;
-		exit(EXIT_FAILURE);
-	}
+	// remove the client from the system
+	sc.log_out_user(username);
 	// Close the client connection.
 	close(client_socket);
 }
@@ -326,8 +166,6 @@ static void login_procedure(int client_socket)
 // and spawn new threads for each new accepted client connection.
 int main(void)
 {
-	// Initialize the client_objects rwlock
-	pthread_rwlock_init(&client_objects_lock, nullptr);
 	// Attach our cleanup handler to SIGINT
 	signal(SIGINT, cleanup_on_exit);
 	// Server socket setup loosely followed from:
