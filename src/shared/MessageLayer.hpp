@@ -175,8 +175,9 @@ std::vector<uint8_t> build_message(const MessageHeader &message_header,
 	// Put the header in first
 	message_to_send.insert(message_to_send.end(), message_header.begin(),
 			       message_header.end());
-	// Put in the string
-	message_to_send.insert(message_to_send.end(), message.begin(),
-			       message.end());
+	if (message.size() > 0)
+		// Put in the message
+		message_to_send.insert(message_to_send.end(), message.begin(),
+				       message.end());
 	return message_to_send;
 }

@@ -14,6 +14,7 @@ Requires the shared MessageLayer Class that is used in to create
 a shared header for transit.
 ----------------------------------------------------------------------*/
 
+#include "MessageLayer.hpp"
 #include <iostream>
 #include "Server.hpp"
 #include "MessagingClient.hpp"
@@ -57,6 +58,25 @@ bool MessagingClient::send_error_message(const std::string &message)
 			.build();
 	auto message_to_send = build_message(header, message);
 	return send_to_client(our_username, message_to_send);
+}
+
+// Send verification message back to the client (ACK or NACK)
+bool MessagingClient::send_verification_message(const MessageTypes &type)
+{
+	// Clear
+	ml.get_internal_header().fill(0);
+	// Set message type and send
+	MessageHeader &header =
+		ml.set_message_type(type)
+			.set_version_number(MessagingClient::version)
+			.set_packet_number(
+				increment_packet_number(packet_number))
+			.set_dest_username(our_username)
+			.set_data_packet_length(0)
+			.build();
+	auto verification_message =
+		build_message<std::array<uint8_t, 0> >(header, {});
+	return send_to_client(our_username, verification_message);
 }
 
 // Main client loop, one for each connected client.
@@ -141,7 +161,7 @@ void MessagingClient::client(void)
 				       build_message(header, usernames));
 			break;
 		}
-		// Message ACK (Not implemented until later assignments)
+		// Message ACK from client?
 		case MessageTypes::ACK: {
 			continue;
 			break;
@@ -152,6 +172,16 @@ void MessagingClient::client(void)
 			ssize_t read_size =
 				read(client_socket, data_package.data(),
 				     data_package.size());
+			// verify the data packet checksum, and respond
+			// appropriately
+			if (!(ml.verify_data_packet_checksum(data_package))) {
+				std::cerr << "Received corrupted message from: "
+					  << our_username << ". Sending NACK."
+					  << std::endl;
+				send_verification_message(MessageTypes::NACK);
+				continue;
+			}
+			send_verification_message(MessageTypes::ACK);
 			// Check whether the socket had an error on read
 			if (read_size <= 0) {
 				std::cerr
