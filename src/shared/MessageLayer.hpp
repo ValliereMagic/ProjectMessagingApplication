@@ -127,12 +127,14 @@ class MessageLayer {
 	// the appropriate place in the header
 	// The +1's are because C++ iterators are exclusive
 	template <typename T>
-	MessageLayer &calculate_data_packet_checksum(const T &data_packet_container)
+	MessageLayer &
+	calculate_data_packet_checksum(const T &data_packet_container)
 	{
 		picosha2::hash256(data_packet_container.begin(),
-				data_packet_container.end(),
-				header.begin() + data_packet_checksum_begin,
-				header.begin() + (data_packet_checksum_end + 1));
+				  data_packet_container.end(),
+				  header.begin() + data_packet_checksum_begin,
+				  header.begin() +
+					  (data_packet_checksum_end + 1));
 		return (*this);
 	}
 
