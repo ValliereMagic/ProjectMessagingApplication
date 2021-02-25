@@ -520,7 +520,7 @@ void message_sender()
 			// Execute the same whether personal or all
 
 			// Make the string  resemble a cstring
-			message = message + "\0";
+			message.append("\0");
 
 			// Create an personal message
 			MessageHeader &header =
