@@ -17,6 +17,7 @@ a shared header for transit.
 #include <iostream>
 #include "Server.hpp"
 #include "MessagingClient.hpp"
+#include "SharedClients.hpp"
 extern "C" {
 #include <unistd.h>
 }
@@ -26,9 +27,11 @@ extern "C" {
 // When the message layer ml is passed to constructor, MessageingClient takes
 // ownership of that object.
 MessagingClient::MessagingClient(int client_socket, uint16_t packet_number,
-				 std::string &our_username, MessageLayer &&ml)
+				 const std::string &our_username,
+				 MessageLayer &&ml)
 	: client_socket(client_socket), our_username(our_username),
-	  packet_number(packet_number), ml(std::move(ml))
+	  packet_number(packet_number), ml(std::move(ml)),
+	  sc(SharedClients::get_instance())
 {
 }
 
@@ -37,7 +40,8 @@ MessagingClient::MessagingClient(int client_socket, uint16_t packet_number,
 MessagingClient::MessagingClient(MessagingClient &&client)
 	: client_socket(client.client_socket),
 	  our_username(std::move(client.our_username)),
-	  packet_number(client.packet_number), ml(std::move(client.ml))
+	  packet_number(client.packet_number), ml(std::move(client.ml)),
+	  sc(SharedClients::get_instance())
 {
 }
 
@@ -56,7 +60,7 @@ bool MessagingClient::send_error_message(const std::string &message)
 			.set_data_packet_length(message.length())
 			.build();
 	auto message_to_send = build_message(header, message);
-	return send_to_client(our_username, message_to_send);
+	return sc.send_to_client(our_username, message_to_send);
 }
 
 // Send verification message back to the client (ACK or NACK)
@@ -75,7 +79,7 @@ bool MessagingClient::send_verification_message(
 			.build();
 	auto verification_message =
 		build_message<std::array<uint8_t, 0> >(header, {});
-	return send_to_client(our_username, verification_message);
+	return sc.send_to_client(our_username, verification_message);
 }
 
 // Main client loop, one for each connected client.
@@ -98,7 +102,7 @@ void MessagingClient::client(void)
 		.set_dest_username("all")
 		.set_data_packet_length(login_message.length())
 		.build();
-	send_to_all(our_username, build_message(header, login_message));
+	sc.send_to_all(our_username, build_message(header, login_message));
 	// The main receive loop
 	while (true) {
 		// Re-clean the header after sending our login message
@@ -142,7 +146,7 @@ void MessagingClient::client(void)
 		// Who message
 		case MessageTypes::WHO: {
 			// Special string with a null terminator in it
-			auto usernames = get_logged_in_users();
+			auto usernames = sc.get_logged_in_users();
 			// Header clear
 			header.fill(0);
 			// Set the required header information
@@ -156,8 +160,8 @@ void MessagingClient::client(void)
 				// the string.
 				.set_data_packet_length(usernames.size())
 				.build();
-			send_to_client(our_username,
-				       build_message(header, usernames));
+			sc.send_to_client(our_username,
+					  build_message(header, usernames));
 			break;
 		}
 		// Message ACK from client?
@@ -201,14 +205,14 @@ void MessagingClient::client(void)
 			std::string dest_username = ml.get_dest_username();
 			// This is a broadcast message
 			if (dest_username == "all") {
-				send_to_all(our_username,
-					    build_message(header,
-							  data_package));
+				sc.send_to_all(our_username,
+					       build_message(header,
+							     data_package));
 				// This is a PM
 			} else {
 				// Send it off to the client, sending off an error
 				// to the sender if they don't exist.
-				if (!(send_to_client(
+				if (!(sc.send_to_client(
 					    dest_username,
 					    build_message(header,
 							  data_package)))) {
@@ -235,8 +239,8 @@ void MessagingClient::client(void)
 				.set_dest_username("all")
 				.set_data_packet_length(leave_message.size())
 				.build();
-			send_to_all(our_username,
-				    build_message(header, leave_message));
+			sc.send_to_all(our_username,
+				       build_message(header, leave_message));
 			// Return and allow login_procedure to finish
 			// and clean up this client.
 			return;

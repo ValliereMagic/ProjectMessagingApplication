@@ -16,6 +16,8 @@ a shared header for transit.
 
 #pragma once
 #include "MessageLayer.hpp"
+// Forward declared to avoid circular dependency
+class SharedClients;
 
 class MessagingClient {
 	const int client_socket;
@@ -25,6 +27,8 @@ class MessagingClient {
 	// interesting values.
 	uint16_t packet_number;
 	MessageLayer ml;
+	// Shared clients instance for talking to other connected clients.
+	SharedClients &sc;
 	// Send error messages to the client
 	bool send_error_message(const std::string &message);
 	// Send verification message back to the client (ACK or NACK)
@@ -36,7 +40,7 @@ class MessagingClient {
 	static const int version = 1;
 
 	MessagingClient(int client_socket, uint16_t packet_number,
-			std::string &our_username, MessageLayer &&ml);
+			const std::string &our_username, MessageLayer &&ml);
 	MessagingClient(MessagingClient &&client);
 	// Handled by the thread that creates and runs this object on
 	// accept. Handles messages sent to the server from the client.

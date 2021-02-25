@@ -3,14 +3,16 @@ CPPFLAGS= -Wall -std=c++11 -O2 -I./shared
 LINKFLAGS = -lpthread -z muldefs
 # Headers
 DEPS = ./shared/MessageLayer.hpp ./shared/picosha2.hpp \
-	   ./server/MessagingClient.hpp ./server/Server.hpp
+	   ./server/MessagingClient.hpp ./server/Server.hpp \
+	   ./server/SharedClients.hpp
 # Object files
 MessageLayerTests = ./shared/MessageLayer.o \
 					./shared/MessageLayerTests.o
 
 MessageServer = ./shared/MessageLayer.o \
 				./server/Server.o \
-				./server/MessagingClient.o
+				./server/MessagingClient.o \
+				./server/SharedClients.o
 
 MessageClient = ./shared/MessageLayer.o \
 				./client/Client.o
