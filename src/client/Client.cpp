@@ -24,6 +24,8 @@ a shared header for transit.
 #include <string>
 #include <cstring>
 #include <atomic>
+#include <mutex>
+#include <random>
 extern "C" {
 #include <unistd.h>
 #include <sys/socket.h>
@@ -37,8 +39,9 @@ extern "C" {
 #define SERVER_ADDRESS "0.0.0.0"
 #define SERVER_PORT 34551
 
-// Thread lock for our list of messages
-static pthread_rwlock_t client_messages_lock;
+
+// Mutex to protect our Unordered Map from multithreaded use 
+std::mutex messages_mutex;
 // List of sent messages
 static std::unordered_map<uint16_t, std::vector<uint8_t> > client_messages;
 
@@ -54,8 +57,6 @@ static int client_socket_fd;
 // It is also called when the program is closing normally.
 void cleanup_on_exit(int signum)
 {
-	// Clear our lock
-	pthread_rwlock_destroy(&client_messages_lock);
 	// Set the atomic bool to false
 	is_running = false;
 	// Call a signal to the other thread to kill themself
@@ -215,34 +216,22 @@ void message_receiver()
 			break;
 
 		// Message Type - Message Acknowledge
-		case (MessageTypes::ACK):
+		case (MessageTypes::ACK): {
+				// Critical section that must be run under lock
+				// Grab Ownership of the Mutex and lock
+				const std::lock_guard<std::mutex> lock(messages_mutex);
+				std::cout << ml.get_packet_number() << " recieved" << std::endl;
 
-			// Lock the wrlock for writing
-			if (pthread_rwlock_wrlock(&client_messages_lock) != 0) {
-				std::cerr
-					<< "Unable to lock the rwlock for writing."
-					<< std::endl;
-				is_running = false;
-				return;
+				// Clear the acknowledged packet from our list
+				if (client_messages.erase(ml.get_packet_number()) ==
+					0) {
+					std::cerr
+						<< "Server acknowledged a packet already acknowledged."
+						<< std::endl;
+				}
+
+				// Mutex Guard will deconstruct when leaving scope, thus freeing lock on mutex
 			}
-
-			// Clear the acknowledged packet from our list
-			if (client_messages.erase(ml.get_packet_number()) ==
-			    0) {
-				std::cerr
-					<< "Server acknowledged a packet already acknowledged."
-					<< std::endl;
-			}
-
-			// Unlock the rwlock, we are done writing now.
-			if (pthread_rwlock_unlock(&client_messages_lock) != 0) {
-				std::cerr
-					<< "Unable to unlock the rwlock after writing."
-					<< std::endl;
-				is_running = false;
-				return;
-			}
-
 			continue;
 			break;
 		// Message Type - Message
@@ -299,18 +288,14 @@ void message_receiver()
 			break;
 		// Message Type No Acknowledge
 		case (MessageTypes::NACK): {
-			// Lock the wrlock for writing
-			if (pthread_rwlock_wrlock(&client_messages_lock) != 0) {
-				std::cerr
-					<< "Unable to lock the rwlock for writing."
-					<< std::endl;
-				is_running = false;
-				return;
-			}
+			// Critical section that must be run under lock
+			// Grab Ownership of the Mutex and lock
+			const std::lock_guard<std::mutex> lock(messages_mutex);
 
 			// Find the location to the packet
 			auto full_message =
 				client_messages.find(ml.get_packet_number());
+			// Check if we found the packet.
 			if (full_message == client_messages.end()) {
 				std::cerr
 					<< "Server Sent a NACK for a packet we don't have."
@@ -326,15 +311,8 @@ void message_receiver()
 				is_running = false;
 				return;
 			}
-
-			// Unlock the rwlock, we are done writing now.
-			if (pthread_rwlock_unlock(&client_messages_lock) != 0) {
-				std::cerr
-					<< "Unable to unlock the rwlock after writing."
-					<< std::endl;
-				is_running = false;
-				return;
-			}
+			
+			// Mutex Guard will deconstruct when leaving scope, thus freeing lock on mutex
 		} break;
 		// Unsupported Message Type
 		default:
@@ -368,6 +346,9 @@ void console_help()
 // server.
 void message_sender()
 {
+	// Set our random distributions.
+	std::random_device random_device("default");
+	std::uniform_int_distribution<int> message_messing_chance(1, 6);
 	signal(SIGUSR2, cleanup_on_exit);
 	std::string username;
 	std::string input;
@@ -551,40 +532,42 @@ void message_sender()
 					.calculate_data_packet_checksum(
 						message) // Add the checksum for the data
 					.set_data_packet_length(
-						message.length() + 1)
+						message.length())
 					.build();
 
 			// Concatenate the vectors to a super vector
 			auto full_message = build_message(header, message);
+			
+			// Critical Section that must be run under lock
+			{
+				// Grab Ownership of the Mutex and lock
+				const std::lock_guard<std::mutex> lock(messages_mutex);
 
-			// Lock the wrlock for writing,
-			if (pthread_rwlock_wrlock(&client_messages_lock) != 0) {
-				std::cerr
-					<< "Unable to lock the rwlock for writing."
-					<< std::endl;
-				cleanup_on_exit(EXIT_FAILURE);
+				// See if the Packet Num is already active
+				if (client_messages.find(packet_number) !=
+					client_messages.end()) {
+					std::cerr
+						<< "Unable to add Message to list, packet # already in use."
+						<< std::endl;
+					cleanup_on_exit(EXIT_FAILURE);
+				}
+				// Otherwise add the full packet to the list
+				else {
+					client_messages.insert(std::make_pair(
+						packet_number, full_message));
+					std::cout << packet_number << "sent" << std::endl;
+				}
+			// Leave scope to remove the lock
 			}
 
-			// See if the Packet Num is already active
-			if (client_messages.find(packet_number) !=
-			    client_messages.end()) {
-				std::cerr
-					<< "Unable to add Message to list, packet # already in use."
-					<< std::endl;
-				cleanup_on_exit(EXIT_FAILURE);
-			}
-			// Otherwise add the full packet to the list
-			else {
-				client_messages.insert(std::make_pair(
-					packet_number, full_message));
-			}
-
-			// Unlock the rwlock, we are done writing now.
-			if (pthread_rwlock_unlock(&client_messages_lock) != 0) {
-				std::cerr
-					<< "Unable to unlock the rwlock after writing."
-					<< std::endl;
-				exit(EXIT_FAILURE);
+			// 1/6 chance of message mockery
+			if (message_messing_chance(random_device) == 1) {
+				// Changing first letter of the message to 'a'
+				if (full_message.size() > 167) {
+					// Obviously won't produce an NAK if started with a anyways
+					full_message[166] = 'a';
+					std::cout << "First letter of Message changed to 'a' to test NACK" << std::endl;
+				}
 			}
 
 			// Send the vector to the server. With no flags. Check to make sure sent.
@@ -612,9 +595,6 @@ void message_sender()
 
 int main(void)
 {
-	// Initialize the client_objects rwlock
-	pthread_rwlock_init(&client_messages_lock, nullptr);
-
 	// Attach our cleanup handler to SIGINT
 	signal(SIGINT, cleanup_on_exit);
 	is_running = true;
