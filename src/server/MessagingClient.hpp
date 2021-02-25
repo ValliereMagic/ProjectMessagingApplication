@@ -1,3 +1,19 @@
+/*======================================================================
+COIS-4310H Assignment 1 - MessagingClient Header
+Name: MessagingClient.hpp
+Written By: Trevor Gilbert & Adam Melaney
+Purpose: This object represents the main receive thread of the server.
+	Each client connected, has an instance of this class running on the server
+	executing the 'client' method. When client is returned from, it means
+	this client is disconnecting.
+
+Compilation: Please use the provided Make file that will make both the
+	client and the server.
+
+Requires the shared MessageLayer Class that is used in to create
+a shared header for transit.
+----------------------------------------------------------------------*/
+
 #pragma once
 #include "MessageLayer.hpp"
 
@@ -11,6 +27,9 @@ class MessagingClient {
 	MessageLayer ml;
 	// Send error messages to the client
 	bool send_error_message(const std::string &message);
+	// Send verification message back to the client (ACK or NACK)
+	bool send_verification_message(const MessageTypes &type,
+				       const uint16_t &packet_number_recv);
 
     public:
 	// MessageHeader Version

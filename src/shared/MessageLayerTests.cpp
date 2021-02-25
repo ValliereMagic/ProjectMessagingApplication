@@ -1,3 +1,22 @@
+/*======================================================================
+COIS-4310H Assignment 1 - MessageLayerTests
+Name: MessageLayerTests.cpp
+Written By:  Adam Melaney & Trevor Gilbert 
+Purpose: Test the creation, verification, and unpacking of message headers
+	as a single class and interface, following the builder pattern; to handle
+	everything we do in the client and server with message headers.
+
+Usage: ./MessageLayerTests
+	(No output means the tests passed)
+	if there are assertion errors, the tests failed.
+
+Description of Parameters
+	None
+
+Creation: Please use the provided Make file that will make both the
+	client and the server.
+----------------------------------------------------------------------*/
+
 #include <cassert>
 #include <iostream>
 #include "MessageLayer.hpp"
@@ -36,4 +55,10 @@ int main(void)
 	header_4.set_message_type(0);
 	MessageLayer header_5(internal_header);
 	assert(!(header_5.valid));
+	// Test the data_packet checksum system
+	std::string message = "banana bread\0";
+	header_5.calculate_data_packet_checksum(message);
+	assert(header_5.verify_data_packet_checksum(message));
+	assert(!(header_5.verify_data_packet_checksum<std::string>(
+		"banana soup\0")));
 }
