@@ -91,8 +91,10 @@ void MessagingClient::client(void)
 	// Retrieve our message header for writing
 	MessageHeader &header = ml.get_internal_header();
 	// Send out a message that I have logged in
-	std::string login_message =
-		"User: " + our_username + " entered the room.\0";
+	std::string login_message;
+	login_message.append("User: ")
+		.append(our_username)
+		.append(" entered the room.\0");
 	// Header clear
 	header.fill(0);
 	// Fill out header and build.
@@ -218,17 +220,20 @@ void MessagingClient::client(void)
 					    build_message(header,
 							  data_package)))) {
 					send_error_message(
-						"User: " + dest_username +
-						" does not exist.\0");
+						std::string()
+							.append("User: ")
+							.append(dest_username)
+							.append(" does not exist.\0"));
 				}
 			}
 			break;
 		}
 		// Disconnect Message
 		case MessageTypes::DISCONNECT: {
-			std::string leave_message =
-				"User: " + our_username +
-				" disconnected from the room.\0";
+			std::string leave_message;
+			leave_message.append("User: ")
+				.append(our_username)
+				.append(" disconnected from the room.\0");
 			// Clear the header
 			header.fill(0);
 			// Set the header information
