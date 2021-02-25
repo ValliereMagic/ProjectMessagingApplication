@@ -1,6 +1,6 @@
 /*======================================================================
 COIS-4310H Assignment 1 - SharedClients
-Name: Server.cpp
+Name: SharedClients.cpp
 Written By:  Adam Melaney & Trevor Gilbert 
 Purpose: This Class facilitates communication between MessagingClient objects.
 
