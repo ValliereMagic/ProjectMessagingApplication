@@ -122,18 +122,20 @@ class MessageLayer {
 	// convert the passed short to network byte order
 	// and put it in it's place within the header.
 	MessageLayer &set_data_packet_length(uint16_t data_packet_len);
+
 	// Calculate the checksum of the data packet, and store it in
 	// the appropriate place in the header
 	// The +1's are because C++ iterators are exclusive
 	template <typename T>
-	void calculate_data_packet_checksum(const T &data_packet_container)
+	MessageLayer &calculate_data_packet_checksum(const T &data_packet_container)
 	{
 		picosha2::hash256(data_packet_container.begin(),
-				  data_packet_container.end(),
-				  header.begin() + data_packet_checksum_begin,
-				  header.begin() +
-					  (data_packet_checksum_end + 1));
+				data_packet_container.end(),
+				header.begin() + data_packet_checksum_begin,
+				header.begin() + (data_packet_checksum_end + 1));
+		return (*this);
 	}
+
 	// Hash the passed data packet container and compare it to the checksum
 	// stored within the header.
 	template <typename T>
