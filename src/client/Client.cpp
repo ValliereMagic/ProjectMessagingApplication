@@ -220,8 +220,6 @@ void message_receiver()
 				// Critical section that must be run under lock
 				// Grab Ownership of the Mutex and lock
 				const std::lock_guard<std::mutex> lock(messages_mutex);
-				std::cout << ml.get_packet_number() << " recieved" << std::endl;
-
 				// Clear the acknowledged packet from our list
 				if (client_messages.erase(ml.get_packet_number()) ==
 					0) {
@@ -555,7 +553,6 @@ void message_sender()
 				else {
 					client_messages.insert(std::make_pair(
 						packet_number, full_message));
-					std::cout << packet_number << "sent" << std::endl;
 				}
 			// Leave scope to remove the lock
 			}
