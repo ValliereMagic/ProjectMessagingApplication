@@ -37,6 +37,12 @@ extern "C" {
 #define SERVER_ADDRESS "0.0.0.0"
 #define SERVER_PORT 34551
 
+
+// Thread lock for our list of messages
+static pthread_rwlock_t client_messages_lock;
+// List of sent messages
+static std::unordered_map<uint16_t, std::vector<uint8_t>> client_messages;
+
 // Live thread of execution. Joined on exit
 static std::thread client_thread;
 // Atomic bool for showing when both threads are running.
@@ -49,6 +55,8 @@ static int client_socket_fd;
 // It is also called when the program is closing normally.
 void cleanup_on_exit(int signum)
 {
+	// Clear our lock
+	pthread_rwlock_destroy(&client_messages_lock);
 	// Set the atomic bool to false
 	is_running = false;
 	// Call a signal to the other thread to kill themself
@@ -132,11 +140,11 @@ void message_receiver()
 		// What type of message is it? And how to handle it.
 		switch (ml.get_message_type()) {
 		// Message Type - Login Request
-		case 0:
+		case (MessageTypes::LOGIN):
 			std::cout << "You have logged in." << std::endl;
 			break;
 		// Message Type - Error
-		case 1:
+		case (MessageTypes::ERROR):
 			// Wait for a new message from the server
 			read_size = read(client_socket_fd, data_package.data(),
 					 data_package.size());
@@ -172,7 +180,7 @@ void message_receiver()
 			break;
 
 		// Message Type - Who
-		case 2:
+		case (MessageTypes::WHO):
 			// Wait for a new message from the server
 			read_size = read(client_socket_fd, data_package.data(),
 					 data_package.size());
@@ -208,10 +216,35 @@ void message_receiver()
 			break;
 
 		// Message Type - Message Acknowledge
-		case 3:
+		case (MessageTypes::ACK):
+
+			// Lock the wrlock for writing, allowing us to add this new user
+			// to the system.
+			if (pthread_rwlock_wrlock(&client_messages_lock) != 0) {
+				std::cerr << "Unable to lock the rwlock for writing."
+					<< std::endl;
+				is_running = false;
+				return;
+			}			
+
+			// Clear the acknowledged packet from our list
+			if (client_messages.erase(ml.get_packet_number()) == 0) {
+				std::cerr << "Server acknowledged a packet already acknowledged."
+					<< std::endl;
+			}
+			
+			// Unlock the rwlock, we are done writing now.
+			if (pthread_rwlock_unlock(&client_messages_lock) != 0) {
+				std::cerr << "Unable to unlock the rwlock after writing."
+					<< std::endl;
+				is_running = false;
+				return;
+			}
+
+			continue;
 			break;
 		// Message Type - Message
-		case 4:
+		case (MessageTypes::MESSAGE):
 			// Wait for a new message from the server
 			read_size = read(client_socket_fd, data_package.data(),
 					 data_package.size());
@@ -255,13 +288,50 @@ void message_receiver()
 					<< std::endl;
 
 			break;
-
 		// Message Type - Disconnect
-		case 5:
+		case (MessageTypes::DISCONNECT):
 			std::cout << "Server has disconnected you."
 				  << std::endl;
 			is_running = false;
 			return;
+			break;
+		// Message Type No Acknowledge
+		case (MessageTypes::NACK):{
+			// Lock the wrlock for writing, allowing us to add this new user
+			// to the system.
+			if (pthread_rwlock_wrlock(&client_messages_lock) != 0) {
+				std::cerr << "Unable to lock the rwlock for writing."
+					<< std::endl;
+				is_running = false;
+				return;
+			}			
+		
+			 // Find the location to the packet
+			auto full_message = client_messages.find(ml.get_packet_number());
+			if (full_message == client_messages.end()) {
+				std::cerr << "Server Sent a NACK for a packet we don't have."
+					<< std::endl;
+				is_running = false;
+				return;
+			}
+
+			// Send the vector to the server. With no flags. Check to make sure sent.
+			if (send(client_socket_fd,
+					(full_message->second).data(), (full_message->second).size(),
+					0) == -1) {
+				is_running = false;
+				return;
+			}				
+ 
+
+			// Unlock the rwlock, we are done writing now.
+			if (pthread_rwlock_unlock(&client_messages_lock) != 0) {
+				std::cerr << "Unable to unlock the rwlock after writing."
+					<< std::endl;
+				is_running = false;
+				return;
+			}
+		}
 			break;
 		// Unsupported Message Type
 		default:
@@ -271,7 +341,7 @@ void message_receiver()
 }
 
 // This function
-void console_help()
+void console_help( )
 {
 	std::cout << "Help" << std::endl;
 	std::cout << "====" << std::endl;
@@ -302,18 +372,18 @@ void message_sender()
 	std::string recipient;
 	std::size_t position;
 	std::size_t position2;
-	std::size_t packet_number = 1;
+	std::uint16_t packet_number = 0;
 	// Get username from the user
 	std::cout << "What will your username be(31 Max):";
 	std::cin >> username;
 
 	// Create message header for login
 	MessageLayer header_1;
-	MessageHeader &header = header_1.set_packet_number(packet_number + 1)
+	MessageHeader &header = header_1.set_packet_number(packet_number)
 					.set_version_number(VERSION)
 					.set_source_username(username)
 					.set_dest_username("server")
-					.set_message_type(0)
+					.set_message_type(MessageTypes::LOGIN)
 					.set_data_packet_length(0)
 					.build();
 
@@ -368,7 +438,7 @@ void message_sender()
 						.set_version_number(VERSION)
 						.set_source_username(username)
 						.set_dest_username("server")
-						.set_message_type(2)
+						.set_message_type(MessageTypes::WHO)
 						.set_data_packet_length(0)
 						.build();
 
@@ -397,7 +467,7 @@ void message_sender()
 						.set_version_number(VERSION)
 						.set_source_username(username)
 						.set_dest_username("server")
-						.set_message_type(5)
+						.set_message_type(MessageTypes::DISCONNECT)
 						.set_data_packet_length(0)
 						.build();
 
@@ -453,84 +523,80 @@ void message_sender()
 					       "all") == 0) {
 				message = input.substr(position2 + 1,
 						       std::string::npos);
-
-				// Create an all message
-				MessageHeader &header =
-					header_1.set_packet_number(
-							packet_number)
-						.set_version_number(VERSION)
-						.set_source_username(username)
-						.set_dest_username("all")
-						.set_message_type(4)
-						.set_data_packet_length(
-							message.length() + 1)
-						.build();
-
-				// Update the packet number
-				packet_number++;
-
-				// Send the header to the server. With no flags. Check to make sure sent.
-				if (send(client_socket_fd,
-					 (void *)(header.data()), header.size(),
-					 0) == -1) {
-					// Cleanup and exit
-					cleanup_on_exit(EXIT_FAILURE);
-				}
-
-				// Send the data to the server. With no flags. Check to make sure sent.
-				if (send(client_socket_fd,
-					 (void *)(message.c_str()),
-					 message.length() + 1, 0) == -1) {
-					// Cleanup and exit
-					cleanup_on_exit(EXIT_FAILURE);
-				}
-
-				// Sent, so iterate to the next user command.
-				continue;
+				recipient = "all";
 			}
 			// Otherwise must be a personal message
-			else {
+			else 
+			{
 				recipient = input.substr(8, (position2 - 8));
 				message = input.substr(position2 + 1,
 						       std::string::npos);
-
-				// Create an personal message
-				MessageHeader &header =
-					header_1.set_packet_number(
-							packet_number)
-						.set_version_number(VERSION)
-						.set_source_username(username)
-						.set_dest_username(recipient)
-						.set_message_type(4)
-						.set_data_packet_length(
-							message.length() + 1)
-						.build();
-
-				// Update the packet number
-				packet_number++;
-
-				// Send the header to the server. With no flags. Check to make sure sent.
-				if (send(client_socket_fd,
-					 (void *)(header.data()), header.size(),
-					 0) == -1) {
-					// Cleanup and exit
-					cleanup_on_exit(EXIT_FAILURE);
-				}
-
-				// Send the data to the server. With no flags. Check to make sure sent.
-				if (send(client_socket_fd,
-					 (void *)(message.c_str()),
-					 message.length() + 1, 0) == -1) {
-					std::cerr
-						<< "Failure to send personal message data through socket"
-						<< std::endl;
-					// Cleanup and exit
-					cleanup_on_exit(EXIT_FAILURE);
-				}
-
-				// Sent, so iterate to the next user command.
-				continue;
 			}
+			// Execute the same whether personal or all
+
+			// Make the string  resemble a cstring
+			message = message + "\0";
+
+			// Create an personal message
+			MessageHeader &header =
+				header_1.set_packet_number(
+						packet_number)
+					.set_version_number(VERSION)
+					.set_source_username(username)
+					.set_dest_username(recipient)
+					.set_message_type(MessageTypes::MESSAGE)
+					.calculate_data_packet_checksum(message) // Add the checksum for the data
+					.set_data_packet_length(
+						message.length() + 1)
+					.build();
+
+			// Concatenate the vectors to a super vector
+			auto full_message = build_message(header, message);
+			
+
+
+			// Lock the wrlock for writing, allowing us to add this new user
+			// to the system.
+			if (pthread_rwlock_wrlock(&client_messages_lock) != 0) {
+				std::cerr << "Unable to lock the rwlock for writing."
+					<< std::endl;
+				cleanup_on_exit(EXIT_FAILURE);
+			}			
+
+			// See if the Packet Num is already active
+			if (client_messages.find(packet_number) != client_messages.end()) {
+				std::cerr << "Unable to add Message to list, packet # already in use."
+					<< std::endl;
+				cleanup_on_exit(EXIT_FAILURE);
+			} 
+			// Otherwise add the full packet to the list
+			else {
+				client_messages.insert(std::make_pair(
+					packet_number,
+					full_message));
+			}
+
+			// Unlock the rwlock, we are done writing now.
+			if (pthread_rwlock_unlock(&client_messages_lock) != 0) {
+				std::cerr << "Unable to unlock the rwlock after writing."
+					<< std::endl;
+				exit(EXIT_FAILURE);
+			}
+
+			// Send the vector to the server. With no flags. Check to make sure sent.
+			if (send(client_socket_fd,
+					full_message.data(), full_message.size(),
+					0) == -1) {
+				// Cleanup and exit
+				cleanup_on_exit(EXIT_FAILURE);
+			}				
+
+
+			// Update the packet number
+			packet_number++;
+
+			// Sent, so iterate to the next user command.
+			continue;
 		}
 		// Contains a space but the command is not message. Must not be proper
 		else {
@@ -544,6 +610,9 @@ void message_sender()
 
 int main(void)
 {
+	// Initialize the client_objects rwlock
+	pthread_rwlock_init(&client_messages_lock, nullptr);
+
 	// Attach our cleanup handler to SIGINT
 	signal(SIGINT, cleanup_on_exit);
 	is_running = true;
