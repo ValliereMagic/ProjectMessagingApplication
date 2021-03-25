@@ -3,5 +3,6 @@
 src/MessageLayerTests
 src/MessageServer
 src/MessageClient
+src/CryptoTests
 .cache
 compile_commands.json
