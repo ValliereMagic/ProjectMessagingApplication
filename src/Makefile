@@ -40,4 +40,4 @@ CryptoTests: $(CryptoTests)
 
 clean:
 	$(RM) $(MessageLayerTests) $(MessageServer) $(MessageClient) $(CryptoTests) \
-	./MessageServer ./MessageLayerTests ./MessageClient
+	./MessageServer ./MessageLayerTests ./MessageClient ./CryptoTests
