@@ -17,8 +17,11 @@ MessageServer = ./shared/MessageLayer.o \
 MessageClient = ./shared/MessageLayer.o \
 				./client/Client.o
 
+CryptoTests = ./shared/CryptoLayer.o \
+			  ./shared/CryptoLayerTests.o
+
 .PHONY : all
-all : MessageLayerTests MessageServer MessageClient
+all : MessageLayerTests MessageServer MessageClient CryptoTests
 
 %.o: %.cpp $(DEPS)
 	$(CC) -c -o $@ $< $(CPPFLAGS)
@@ -32,6 +35,9 @@ MessageServer: $(MessageServer)
 MessageClient: $(MessageClient)
 	$(CC) -o $@ $^ $(LINKFLAGS)
 
+CryptoTests: $(CryptoTests)
+	$(CC) -o $@ $^ $(LINKFLAGS) -lsodium
+
 clean:
-	$(RM) $(MessageLayerTests) $(MessageServer) $(MessageClient) ./MessageServer \
-		  ./MessageLayerTests ./MessageClient
+	$(RM) $(MessageLayerTests) $(MessageServer) $(MessageClient) $(CryptoTests) \
+	./MessageServer ./MessageLayerTests ./MessageClient
