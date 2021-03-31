@@ -14,7 +14,7 @@ Compilation: Please use the provided Make file that will make both the
 	client and the server.
 
 Requires the shared MessageLayer Class that is used in to create
-a shared header for transit.
+a shared header for transit. Also requires the CryptoLayer Class.
 ----------------------------------------------------------------------*/
 
 #include <iostream>
@@ -34,8 +34,9 @@ extern "C" {
 #include <pthread.h>
 }
 #include "MessageLayer.hpp"
+#include "CryptoLayer.hpp"
 
-#define VERSION 2
+#define VERSION 3
 #define SERVER_ADDRESS "0.0.0.0"
 #define SERVER_PORT 34551
 
@@ -52,6 +53,9 @@ static std::atomic<bool> is_running;
 
 // The client socket file descriptor. Global
 static int client_socket_fd;
+
+// Encryption key for the room
+static Crypto::StreamKey encryption_key;
 
 // This function is multipurposed. It is used by the sig handler to cleanup on ^c
 // It is also called when the program is closing normally.
@@ -233,7 +237,7 @@ void message_receiver()
 			continue;
 			break;
 		// Message Type - Message
-		case (MessageTypes::MESSAGE):
+		case (MessageTypes::MESSAGE): {
 			// Wait for a new message from the server
 			read_size = read(client_socket_fd, data_package.data(),
 					 data_package.size());
@@ -258,25 +262,56 @@ void message_receiver()
 					<< std::endl;
 				continue;
 			}
+			
+			// Check if its an unencrypted server message
+			if (ml.get_source_username() == "server") {
+				// Output message from server
+				if (ml.get_dest_username() == "all")
+					std::cout
+						<< "(Room) " << ml.get_source_username()
+						<< " says > "
+						<< build_string_safe(
+					     (char *)data_package.data(),
+					     ml.get_data_packet_length())
+						<< std::endl;
+				else
+					std::cout
+						<< ml.get_source_username()
+						<< " whispers to you > "
+						<< build_string_safe(
+					     (char *)data_package.data(),
+					     ml.get_data_packet_length())
+						<< std::endl;
+			}
+			// Else its an encrypted message
+			else {
+				// Decrypt the message
+				auto decrypted_message = Crypto::decrypt(data_package, encryption_key);
 
-			if (ml.get_dest_username() == "all")
-				std::cout
-					<< "(Room) " << ml.get_source_username()
-					<< " says > "
-					<< build_string_safe(
-						   (char *)data_package.data(),
-						   ml.get_data_packet_length())
-					<< std::endl;
-			else
-				std::cout
-					<< ml.get_source_username()
-					<< " whispers to you > "
-					<< build_string_safe(
-						   (char *)data_package.data(),
-						   ml.get_data_packet_length())
-					<< std::endl;
+				// Check if key was able decrypt message
+				if (std::get<0>(decrypted_message) == false) {
+					std::cout << "Message from " << ml.get_source_username() 
+					<< " not able to decrypt." << std::endl;
+					continue;
+				}
+
+				// Output message
+				if (ml.get_dest_username() == "all")
+					std::cout
+						<< "(Room) " << ml.get_source_username()
+						<< " says > "
+						<< std::get<1>(decrypted_message)
+						<< std::endl;
+				else
+					std::cout
+						<< ml.get_source_username()
+						<< " whispers to you > "
+						<< std::get<1>(decrypted_message)
+						<< std::endl;
+			}
 
 			break;
+		}
 		// Message Type - Disconnect
 		case (MessageTypes::DISCONNECT):
 			std::cout << "Server has disconnected you."
@@ -352,12 +387,29 @@ void message_sender()
 	std::string input;
 	std::string message;
 	std::string recipient;
+	std::string password;
 	std::size_t position;
 	std::size_t position2;
 	std::uint16_t packet_number = 0;
+	
 	// Get username from the user
 	std::cout << "What will your username be(31 Max):";
 	std::cin >> username;
+
+	// Get the password from the user
+	std::cout << "Enter the password for the server:";
+	std::cin >> password;
+	auto derived_key = Crypto::derive_key_from_password(password);
+
+	// Check if key was successfully derived
+	if (std::get<0>(derived_key) == false) {
+		std::cerr << "Failure to derive key" << std::endl;
+		// Cleanup and exit
+		cleanup_on_exit(EXIT_FAILURE);
+	}
+	
+	// Set the global encryption_key with our derived key
+	encryption_key = std::get<1>(derived_key);
 
 	// Create message header for login
 	MessageLayer header_1;
@@ -520,6 +572,15 @@ void message_sender()
 			// Make the string  resemble a cstring
 			message.append("\0");
 
+			// Encrypt the message
+			auto encrypted_message = Crypto::encrypt(message, encryption_key);
+
+			// Check if encryption was able to be completed.		
+			if (std::get<0>(encrypted_message) == false) {
+				std::cerr << "Unable to encrypt" << std::endl;
+				cleanup_on_exit(EXIT_FAILURE);
+			}
+
 			// Create an personal message
 			MessageHeader &header =
 				header_1.set_packet_number(packet_number)
@@ -528,13 +589,13 @@ void message_sender()
 					.set_dest_username(recipient)
 					.set_message_type(MessageTypes::MESSAGE)
 					.calculate_data_packet_checksum(
-						message) // Add the checksum for the data
+						std::get<1>(encrypted_message)) // Add the checksum for the data
 					.set_data_packet_length(
-						message.length())
+						std::get<1>(encrypted_message).size())
 					.build();
 
 			// Concatenate the vectors to a super vector
-			auto full_message = build_message(header, message);
+			auto full_message = build_message(header, std::get<1>(encrypted_message));
 			
 			// Critical Section that must be run under lock
 			{
