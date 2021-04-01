@@ -286,6 +286,7 @@ void message_receiver()
 			// Else its an encrypted message
 			else {
 				// Decrypt the message
+				// Returns a tuple with a bool as value 0 and a string value 1
 				auto decrypted_message = Crypto::decrypt(data_package, encryption_key);
 
 				// Check if key was able decrypt message
@@ -409,6 +410,7 @@ void message_sender()
 	}
 	
 	// Set the global encryption_key with our derived key
+	// Returns a tuple with a bool as value 0 and a Streamkey as value 1
 	encryption_key = std::get<1>(derived_key);
 
 	// Create message header for login
@@ -573,6 +575,7 @@ void message_sender()
 			message.append("\0");
 
 			// Encrypt the message
+			// Returns a tuple with a bool as value 0 and a vector value 1
 			auto encrypted_message = Crypto::encrypt(message, encryption_key);
 
 			// Check if encryption was able to be completed.		
