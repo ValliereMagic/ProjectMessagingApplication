@@ -15,7 +15,8 @@ MessageServer = ./shared/MessageLayer.o \
 				./server/SharedClients.o
 
 MessageClient = ./shared/MessageLayer.o \
-				./client/Client.o
+				./client/Client.o \
+				./shared/CryptoLayer.o
 
 CryptoTests = ./shared/CryptoLayer.o \
 			  ./shared/CryptoLayerTests.o
@@ -33,7 +34,7 @@ MessageServer: $(MessageServer)
 	$(CC) -o $@ $^ $(LINKFLAGS)
 
 MessageClient: $(MessageClient)
-	$(CC) -o $@ $^ $(LINKFLAGS)
+	$(CC) -o $@ $^ $(LINKFLAGS) -lsodium
 
 CryptoTests: $(CryptoTests)
 	$(CC) -o $@ $^ $(LINKFLAGS) -lsodium
