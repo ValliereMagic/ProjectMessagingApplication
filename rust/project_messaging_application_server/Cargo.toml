@@ -1,0 +1,11 @@
+[package]
+name = "project_messaging_application"
+version = "0.1.0"
+edition = "2018"
+description = "Toy Messaging Application Spawned from a 4th year course [Server]"
+
+[[bin]]
+name = "server"
+path = "src/server.rs"
+
+[dependencies]
