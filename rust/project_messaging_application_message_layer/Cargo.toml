@@ -7,3 +7,4 @@ edition = "2018"
 description = "Messaging Layer for Toy messaging application"
 
 [dependencies]
+sha2 = "0.9"

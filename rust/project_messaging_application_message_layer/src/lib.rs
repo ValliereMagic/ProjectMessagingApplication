@@ -1,4 +1,5 @@
 pub mod message_layer {
+	use sha2::{Digest, Sha256};
 	use std::convert::TryInto;
 	// Header indices constants
 	const PACKET_NUMBER_BEGIN: usize = 0;
@@ -8,8 +9,8 @@ pub mod message_layer {
 	const MESSAGE_TYPE_BEGIN: usize = 67;
 	const DATA_PACKET_LENGTH_BEGIN: usize = 68;
 	const DATA_PACKET_CHECKSUM_BEGIN: usize = 70;
-	const FUTURE_USE_BEGIN: usize = 134;
-	const HEADER_CHECKSUM_BEGIN: usize = 165;
+	const FUTURE_USE_BEGIN: usize = 102;
+	const HEADER_CHECKSUM_BEGIN: usize = 134;
 	// Maximum username length
 	const USERNAME_LEN: usize = 32;
 
@@ -21,13 +22,50 @@ pub mod message_layer {
 		pub fn new() -> MessageHeader {
 			MessageHeader { 0: [0u8; 166] }
 		}
-		pub fn verify_header_checksum(&self) -> Result<Self, &'static str> {
-			Err("Unimplemented")
+		// Calculate the checksum of the entire header except for the checksum
+		// field at the end.
+		pub fn calculate_header_checksum(&mut self) {
+			let mut hasher = Sha256::new();
+			// Pass a reference of the portion of the header to be checksummed
+			// to the hasher.
+			hasher.update(&self.0[0..HEADER_CHECKSUM_BEGIN]);
+			// Emplace the checksum into the header field.
+			let mut begin_idx = HEADER_CHECKSUM_BEGIN;
+			for byte in hasher.finalize().iter() {
+				self.0[begin_idx] = *byte;
+				begin_idx += 1;
+			}
 		}
-		pub fn verify_data_checksum(&self, data_portion: &Vec<u8>) -> Result<Self, &'static str> {
-			Err("Unimplemented")
+		// Verify that the message header hasn't been tampered, by calculating
+		// its SHA256 checksum and comparing it to the one stored within it.
+		pub fn verify_header_checksum(&self) -> bool {
+			let mut hasher = Sha256::new();
+			hasher.update(&self.0[0..HEADER_CHECKSUM_BEGIN]);
+			let hash = hasher.finalize();
+			hash[..] == self.0[HEADER_CHECKSUM_BEGIN..]
 		}
-		pub fn set_packet_num(&mut self, packet_num: u16) -> &Self {
+		// Calculate a SHA256 checksum for the message itself, and store it
+		// within the header.
+		pub fn calculate_data_checksum(&mut self, data_portion: &Vec<u8>) {
+			let mut hasher = Sha256::new();
+			// Pass a reference of the portion of data to be checksummed
+			// to the hasher.
+			hasher.update(data_portion);
+			// Emplace the checksum into the header field.
+			let mut begin_idx = DATA_PACKET_CHECKSUM_BEGIN;
+			for byte in hasher.finalize().iter() {
+				self.0[begin_idx] = *byte;
+				begin_idx += 1;
+			}
+		}
+		// Verify that the message itself hasn't been tampered with
+		pub fn verify_data_checksum(&self, data_portion: &Vec<u8>) -> bool {
+			let mut hasher = Sha256::new();
+			hasher.update(data_portion);
+			let hash = hasher.finalize();
+			hash[..] == self.0[DATA_PACKET_CHECKSUM_BEGIN..FUTURE_USE_BEGIN]
+		}
+		pub fn set_packet_num(&mut self, packet_num: u16) -> &mut Self {
 			// Convert the packet number to big endian (Network Byte order)
 			let net_packet_num: [u8; 2] = packet_num.to_be_bytes();
 			// Place it at its spot in the message header.
@@ -39,13 +77,12 @@ pub mod message_layer {
 		pub fn get_packet_num(&self) -> u16 {
 			// Convert bytes 0..2(exclusive) to a u16
 			// If this somehow failed... we'd have bigger fish to fry.
-			u16::from_be_bytes(
-				(self.0[PACKET_NUMBER_BEGIN..HEADER_VERSION_BEGIN])
-					.try_into()
-					.unwrap(),
-			)
+			let packet_num: &[u8; 2] = &self.0[PACKET_NUMBER_BEGIN..HEADER_VERSION_BEGIN]
+				.try_into()
+				.unwrap();
+			u16::from_be_bytes(*packet_num)
 		}
-		pub fn set_version_num(&mut self, version_num: u8) -> &Self {
+		pub fn set_version_num(&mut self, version_num: u8) -> &mut Self {
 			self.0[HEADER_VERSION_BEGIN] = version_num;
 			self
 		}
@@ -61,7 +98,7 @@ pub mod message_layer {
 				if idx == bytes.len() {
 					self.0[SOURCE_USERNAME_BEGIN + idx] = 0;
 				// Still placing characters
-				} else if idx < 32 {
+				} else if idx < USERNAME_LEN {
 					self.0[SOURCE_USERNAME_BEGIN + idx] = *byte;
 					idx += 1;
 				// The username is too long.
@@ -120,5 +157,26 @@ mod tests {
 			Ok(_) => Err("This username is too long, and should fail."),
 			Err(_) => Ok(()),
 		}
+	}
+	#[test]
+	fn test_header_checksumming() {
+		let mut header = MessageHeader::new();
+		header.set_packet_num(5).set_version_num(3);
+		header.calculate_header_checksum();
+		// Make sure verification works
+		assert!(header.verify_header_checksum());
+		// Mess up the header
+		header.set_packet_num(16);
+		// make sure it gets caught.
+		assert!(!(header.verify_header_checksum()));
+	}
+	#[test]
+	fn test_data_checksumming() {
+		let mut header = MessageHeader::new();
+		let garbage: Vec<u8> = vec![0, 1, 2, 3];
+		let garbage2: Vec<u8> = vec![3, 2, 1, 0];
+		header.calculate_data_checksum(&garbage);
+		assert!(header.verify_data_checksum(&garbage));
+		assert!(!(header.verify_data_checksum(&garbage2)));
 	}
 }
