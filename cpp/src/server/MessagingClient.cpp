@@ -204,16 +204,6 @@ void MessagingClient::client(void)
 					<< std::endl;
 				continue;
 			}
-			// Try to snoop on the message by printing it out in Hex
-			std::cout << "Receiving a message from: "
-				  << ml.get_source_username()
-				  << ", to: " << ml.get_dest_username() << "\n";
-			std::cout << "Message: 0x";
-			std::cout << std::hex;
-			for (auto b : data_package) {
-				std::cout << +b;
-			}
-			std::cout << std::dec << "\n";
 			// Check whether this is a broadcast or a PM
 			std::string dest_username = ml.get_dest_username();
 			// This is a broadcast message
