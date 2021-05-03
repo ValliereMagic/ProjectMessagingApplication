@@ -40,8 +40,7 @@ extern "C" {
 #define SERVER_ADDRESS "0.0.0.0"
 #define SERVER_PORT 34551
 
-
-// Mutex to protect our Unordered Map from multithreaded use 
+// Mutex to protect our Unordered Map from multithreaded use
 std::mutex messages_mutex;
 // List of sent messages
 static std::unordered_map<uint16_t, std::vector<uint8_t> > client_messages;
@@ -221,19 +220,19 @@ void message_receiver()
 
 		// Message Type - Message Acknowledge
 		case (MessageTypes::ACK): {
-				// Critical section that must be run under lock
-				// Grab Ownership of the Mutex and lock
-				const std::lock_guard<std::mutex> lock(messages_mutex);
-				// Clear the acknowledged packet from our list
-				if (client_messages.erase(ml.get_packet_number()) ==
-					0) {
-					std::cerr
-						<< "Server acknowledged a packet already acknowledged."
-						<< std::endl;
-				}
-
-				// Mutex Guard will deconstruct when leaving scope, thus freeing lock on mutex
+			// Critical section that must be run under lock
+			// Grab Ownership of the Mutex and lock
+			const std::lock_guard<std::mutex> lock(messages_mutex);
+			// Clear the acknowledged packet from our list
+			if (client_messages.erase(ml.get_packet_number()) ==
+			    0) {
+				std::cerr
+					<< "Server acknowledged a packet already acknowledged."
+					<< std::endl;
 			}
+
+			// Mutex Guard will deconstruct when leaving scope, thus freeing lock on mutex
+		}
 			continue;
 			break;
 		// Message Type - Message
@@ -262,53 +261,60 @@ void message_receiver()
 					<< std::endl;
 				continue;
 			}
-			
+
 			// Check if its an unencrypted server message
 			if (ml.get_source_username() == "server") {
 				// Output message from server
 				if (ml.get_dest_username() == "all")
 					std::cout
-						<< "(Room) " << ml.get_source_username()
+						<< "(Room) "
+						<< ml.get_source_username()
 						<< " says > "
 						<< build_string_safe(
-					     (char *)data_package.data(),
-					     ml.get_data_packet_length())
+							   (char *)data_package
+								   .data(),
+							   ml.get_data_packet_length())
 						<< std::endl;
 				else
 					std::cout
 						<< ml.get_source_username()
 						<< " whispers to you > "
 						<< build_string_safe(
-					     (char *)data_package.data(),
-					     ml.get_data_packet_length())
+							   (char *)data_package
+								   .data(),
+							   ml.get_data_packet_length())
 						<< std::endl;
 			}
 			// Else its an encrypted message
 			else {
 				// Decrypt the message
 				// Returns a tuple with a bool as value 0 and a string value 1
-				auto decrypted_message = Crypto::decrypt(data_package, encryption_key);
+				auto decrypted_message = Crypto::decrypt(
+					data_package, encryption_key);
 
 				// Check if key was able decrypt message
 				if (std::get<0>(decrypted_message) == false) {
-					std::cout << "Message from " << ml.get_source_username() 
-					<< " not able to decrypt." << std::endl;
+					std::cout << "Message from "
+						  << ml.get_source_username()
+						  << " not able to decrypt."
+						  << std::endl;
 					continue;
 				}
 
 				// Output message
 				if (ml.get_dest_username() == "all")
-					std::cout
-						<< "(Room) " << ml.get_source_username()
-						<< " says > "
-						<< std::get<1>(decrypted_message)
-						<< std::endl;
+					std::cout << "(Room) "
+						  << ml.get_source_username()
+						  << " says > "
+						  << std::get<1>(
+							     decrypted_message)
+						  << std::endl;
 				else
-					std::cout
-						<< ml.get_source_username()
-						<< " whispers to you > "
-						<< std::get<1>(decrypted_message)
-						<< std::endl;
+					std::cout << ml.get_source_username()
+						  << " whispers to you > "
+						  << std::get<1>(
+							     decrypted_message)
+						  << std::endl;
 			}
 
 			break;
@@ -345,7 +351,7 @@ void message_receiver()
 				is_running = false;
 				return;
 			}
-			
+
 			// Mutex Guard will deconstruct when leaving scope, thus freeing lock on mutex
 		} break;
 		// Unsupported Message Type
@@ -380,9 +386,6 @@ void console_help()
 // server.
 void message_sender()
 {
-	// Set our random distributions.
-	std::random_device random_device("default");
-	std::uniform_int_distribution<int> message_messing_chance(1, 6);
 	signal(SIGUSR2, cleanup_on_exit);
 	std::string username;
 	std::string input;
@@ -392,7 +395,7 @@ void message_sender()
 	std::size_t position;
 	std::size_t position2;
 	std::uint16_t packet_number = 0;
-	
+
 	// Get username from the user
 	std::cout << "What will your username be(31 Max):";
 	std::cin >> username;
@@ -408,7 +411,7 @@ void message_sender()
 		// Cleanup and exit
 		cleanup_on_exit(EXIT_FAILURE);
 	}
-	
+
 	// Set the global encryption_key with our derived key
 	// Returns a tuple with a bool as value 0 and a Streamkey as value 1
 	encryption_key = std::get<1>(derived_key);
@@ -576,9 +579,10 @@ void message_sender()
 
 			// Encrypt the message
 			// Returns a tuple with a bool as value 0 and a vector value 1
-			auto encrypted_message = Crypto::encrypt(message, encryption_key);
+			auto encrypted_message =
+				Crypto::encrypt(message, encryption_key);
 
-			// Check if encryption was able to be completed.		
+			// Check if encryption was able to be completed.
 			if (std::get<0>(encrypted_message) == false) {
 				std::cerr << "Unable to encrypt" << std::endl;
 				cleanup_on_exit(EXIT_FAILURE);
@@ -591,23 +595,27 @@ void message_sender()
 					.set_source_username(username)
 					.set_dest_username(recipient)
 					.set_message_type(MessageTypes::MESSAGE)
-					.calculate_data_packet_checksum(
-						std::get<1>(encrypted_message)) // Add the checksum for the data
+					.calculate_data_packet_checksum(std::get<
+									1>(
+						encrypted_message)) // Add the checksum for the data
 					.set_data_packet_length(
-						std::get<1>(encrypted_message).size())
+						std::get<1>(encrypted_message)
+							.size())
 					.build();
 
 			// Concatenate the vectors to a super vector
-			auto full_message = build_message(header, std::get<1>(encrypted_message));
-			
+			auto full_message = build_message(
+				header, std::get<1>(encrypted_message));
+
 			// Critical Section that must be run under lock
 			{
 				// Grab Ownership of the Mutex and lock
-				const std::lock_guard<std::mutex> lock(messages_mutex);
+				const std::lock_guard<std::mutex> lock(
+					messages_mutex);
 
 				// See if the Packet Num is already active
 				if (client_messages.find(packet_number) !=
-					client_messages.end()) {
+				    client_messages.end()) {
 					std::cerr
 						<< "Unable to add Message to list, packet # already in use."
 						<< std::endl;
@@ -618,19 +626,8 @@ void message_sender()
 					client_messages.insert(std::make_pair(
 						packet_number, full_message));
 				}
-			// Leave scope to remove the lock
+				// Leave scope to remove the lock
 			}
-
-			// 1/6 chance of message mockery
-			if (message_messing_chance(random_device) == 1) {
-				// Changing first letter of the message to 'a'
-				if (full_message.size() > 167) {
-					// Obviously won't produce an NAK if started with a anyways
-					full_message[166] = 'a';
-					std::cout << "First letter of Message changed to 'a' to test NACK" << std::endl;
-				}
-			}
-
 			// Send the vector to the server. With no flags. Check to make sure sent.
 			if (send(client_socket_fd, full_message.data(),
 				 full_message.size(), 0) == -1) {
