@@ -1,10 +1,10 @@
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [package]
-name = "project_messaging_application_message_layer"
+name = "server"
 version = "0.1.0"
 edition = "2018"
-description = "Messaging Layer for Toy messaging application"
+description = "Toy Messaging Application Spawned from a 4th year course [Server]"
 
 [dependencies]
-sha2 = "0.9"
+message_layer = { path = "../message_layer"}

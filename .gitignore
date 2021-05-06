@@ -1,9 +1,10 @@
 *.o
 .vscode/
-src/MessageLayerTests
-src/MessageServer
-src/MessageClient
-src/CryptoTests
+cpp/src/MessageLayerTests
+cpp/src/MessageServer
+cpp/src/MessageClient
+cpp/src/CryptoTests
 .cache
 compile_commands.json
 rust/*/target/
+rust/*/Cargo.lock
