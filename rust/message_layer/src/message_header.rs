@@ -14,6 +14,17 @@ const HEADER_CHECKSUM_BEGIN: usize = 134;
 // Maximum username length
 const USERNAME_LEN: usize = 32;
 
+// Message Types
+pub enum MessageTypes {
+	LOGIN = 0,
+	ERROR,
+	WHO,
+	ACK,
+	MESSAGE,
+	DISCONNECT,
+	NACK,
+}
+
 // A message header is composed of many fields read from the client
 pub struct MessageHeader(pub [u8; 166]);
 
