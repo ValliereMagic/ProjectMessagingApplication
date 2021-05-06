@@ -15,6 +15,8 @@ fn login(client: TcpStream) {
 			// For now, lets print out all the information about the messages we
 			// are receiving.
 			Ok(m) => {
+				// Example message type conversion
+				let _: MessageTypes = MessageTypes::from_u8(1);
 				// Example message write
 				let mut message_to_send = (MessageHeader::new(), None);
 				message_to_send.0.set_message_type(MessageTypes::WHO as u8);

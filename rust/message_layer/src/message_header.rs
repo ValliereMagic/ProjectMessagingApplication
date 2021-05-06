@@ -17,12 +17,27 @@ const USERNAME_LEN: usize = 32;
 // Message Types
 pub enum MessageTypes {
 	LOGIN = 0,
-	ERROR,
-	WHO,
-	ACK,
-	MESSAGE,
-	DISCONNECT,
-	NACK,
+	ERROR = 1,
+	WHO = 2,
+	ACK = 3,
+	MESSAGE = 4,
+	DISCONNECT = 5,
+	NACK = 6,
+}
+
+impl MessageTypes {
+	pub fn from_u8(value: u8) -> MessageTypes {
+		match value {
+			0 => MessageTypes::LOGIN,
+			1 => MessageTypes::ERROR,
+			2 => MessageTypes::WHO,
+			3 => MessageTypes::ACK,
+			4 => MessageTypes::MESSAGE,
+			5 => MessageTypes::DISCONNECT,
+			6 => MessageTypes::NACK,
+			_ => panic!("Unknown Message Type: {}", value),
+		}
+	}
 }
 
 // A message header is composed of many fields read from the client
