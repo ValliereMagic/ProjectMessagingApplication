@@ -3,23 +3,23 @@ use std::io::{Read, Write};
 use std::net::TcpStream;
 type Message = (MessageHeader, Option<Vec<u8>>);
 
-pub struct MessageLayer<'a> {
-	client: &'a TcpStream,
+pub struct MessageLayer {
+	client: TcpStream,
 }
 
-impl<'a> MessageLayer<'a> {
+impl MessageLayer {
 	// Very interesting things going on here, borrowing an *immutable reference*
 	// as mutable...
 	// https://stackoverflow.com/questions/36233193/why-can-i-just-pass-an-immutable-reference-to-bufreader-instead-of-a-mutable-re
-	pub fn new(client_fd: &'a TcpStream) -> MessageLayer<'a> {
+	pub fn new(client_fd: TcpStream) -> MessageLayer {
 		MessageLayer { client: client_fd }
 	}
 	// Read a message from the client FD
-	pub fn read_basic_message(&mut self) -> Result<Message, String> {
+	pub fn read_basic_message(&self) -> Result<Message, String> {
 		// Read in the message header from the FD
 		let mut header = MessageHeader::new();
 		// Try to read a header from the FD
-		match self.client.read_exact(&mut header.0[..]) {
+		match (&mut (&self.client)).read_exact(&mut header.0[..]) {
 			Ok(_) => (),
 			Err(err) => {
 				return Err(format!("{}", err));
@@ -42,7 +42,7 @@ impl<'a> MessageLayer<'a> {
 			}
 			// Read in the body initializing the vector.
 			// Make sure we were able to read it in correctly.
-			match self.client.read_exact(&mut body_vec[..]) {
+			match (&mut (&self.client)).read_exact(&mut body_vec[..]) {
 				Ok(_) => (),
 				Err(err) => {
 					return Err(format!("{}", err));
@@ -53,12 +53,12 @@ impl<'a> MessageLayer<'a> {
 		return Ok((header, message_body));
 	}
 	// Write a message to the FD
-	pub fn write_basic_message(&mut self, message: &Message) -> std::io::Result<usize> {
+	pub fn write_basic_message(&self, message: &Message) -> std::io::Result<usize> {
 		// Write out the header
-		self.client.write(&message.0 .0[..])?;
+		(&mut (&self.client)).write(&message.0 .0[..])?;
 		// Write out the body if it exists.
 		match &message.1 {
-			Some(message) => self.client.write(&message[..]),
+			Some(message) => (&mut (&self.client)).write(&message[..]),
 			None => Ok(0),
 		}
 	}
@@ -66,7 +66,7 @@ impl<'a> MessageLayer<'a> {
 
 // Create an iterator allowing for looping over the messages from app_layer
 // as they come in.
-impl<'a> Iterator for MessageLayer<'a> {
+impl Iterator for &MessageLayer {
 	type Item = Result<Message, String>;
 
 	fn next(&mut self) -> Option<Self::Item> {
