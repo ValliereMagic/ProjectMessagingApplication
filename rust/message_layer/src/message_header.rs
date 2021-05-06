@@ -15,9 +15,11 @@ const HEADER_CHECKSUM_BEGIN: usize = 134;
 const USERNAME_LEN: usize = 32;
 
 // A message header is composed of many fields read from the client
-pub struct MessageHeader([u8; 166]);
+pub struct MessageHeader(pub [u8; 166]);
 
 impl MessageHeader {
+	// Insert a username into the header at the specified beginning index. If
+	// the username is longer than 32 bytes, then this will fail.
 	fn set_username(
 		&mut self,
 		username: &str,
@@ -41,6 +43,8 @@ impl MessageHeader {
 		}
 		Ok(self)
 	}
+	// Pull a username from the header at a beginning with a maximum length of
+	// 32 bytes. (A shorter username will be null terminated)
 	fn get_username(&self, begin_idx: usize) -> Result<String, &'static str> {
 		// Extract a slice of the username from the header
 		let byte_slice: &[u8] = &(self.0[begin_idx..begin_idx + 32]);
@@ -59,6 +63,8 @@ impl MessageHeader {
 			Err(_) => Err("An error occurred pulling in the username string."),
 		}
 	}
+	// Put a unsigned short into the header at a specified index. Before
+	// insertion the short is converted to network byte order.
 	fn set_u16_at_index(&mut self, num: u16, header_idx: usize) -> &mut Self {
 		// Convert the packet number to big endian (Network Byte order)
 		let net_packet_num: [u8; 2] = num.to_be_bytes();
@@ -68,6 +74,9 @@ impl MessageHeader {
 		}
 		self
 	}
+	// Return an unsigned short from the specified index in the header. It will
+	// automatically be converted from network byte order to the host byte
+	// order.
 	fn get_u16_at_index(&self, idx: usize) -> u16 {
 		// Convert 2 bytes to a u16
 		// If this somehow failed... we'd have bigger fish to fry.
@@ -121,9 +130,11 @@ impl MessageHeader {
 		let hash = hasher.finalize();
 		hash[..] == self.0[DATA_PACKET_CHECKSUM_BEGIN..FUTURE_USE_BEGIN]
 	}
+	// Emplace the packet number into the message header
 	pub fn set_packet_num(&mut self, packet_num: u16) -> &mut Self {
 		self.set_u16_at_index(packet_num, PACKET_NUMBER_BEGIN)
 	}
+	// return the packet number by extracting it from the message header.
 	pub fn get_packet_num(&self) -> u16 {
 		self.get_u16_at_index(PACKET_NUMBER_BEGIN)
 	}
@@ -212,6 +223,8 @@ mod tests {
 	}
 	#[test]
 	fn test_data_checksumming() {
+		// Make sure that the checksum catches when the data portion has been
+		// tampered with
 		let mut header = MessageHeader::new();
 		let garbage: Vec<u8> = vec![0, 1, 2, 3];
 		let garbage2: Vec<u8> = vec![3, 2, 1, 0];
