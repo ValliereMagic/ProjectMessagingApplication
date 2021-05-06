@@ -3,13 +3,13 @@ use std::io::{Read, Write};
 use std::net::TcpStream;
 type Message = (MessageHeader, Option<Vec<u8>>);
 
-pub struct MessageLayer {
-	client: TcpStream,
+pub struct MessageLayer<'a> {
+	client: &'a TcpStream,
 }
 
-impl MessageLayer {
+impl<'a> MessageLayer<'a> {
 	// Create a new message layer by taking ownership of the client handle
-	pub fn new(client_fd: TcpStream) -> MessageLayer {
+	pub fn new(client_fd: &'a TcpStream) -> MessageLayer<'a> {
 		MessageLayer { client: client_fd }
 	}
 	// Read a message from the client FD
@@ -64,7 +64,7 @@ impl MessageLayer {
 
 // Create an iterator allowing for looping over the messages from app_layer
 // as they come in.
-impl Iterator for MessageLayer {
+impl<'a> Iterator for MessageLayer<'a> {
 	type Item = Result<Message, String>;
 
 	fn next(&mut self) -> Option<Self::Item> {
