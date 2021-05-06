@@ -8,7 +8,9 @@ pub struct MessageLayer<'a> {
 }
 
 impl<'a> MessageLayer<'a> {
-	// Create a new message layer by taking ownership of the client handle
+	// Very interesting things going on here, borrowing an *immutable reference*
+	// as mutable...
+	// https://stackoverflow.com/questions/36233193/why-can-i-just-pass-an-immutable-reference-to-bufreader-instead-of-a-mutable-re
 	pub fn new(client_fd: &'a TcpStream) -> MessageLayer<'a> {
 		MessageLayer { client: client_fd }
 	}
