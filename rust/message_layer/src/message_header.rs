@@ -1,6 +1,9 @@
 extern crate sha2;
 use sha2::{Digest, Sha256};
 use std::convert::TryInto;
+
+pub const VERSION: u8 = 3;
+
 // Header indices constants
 const PACKET_NUMBER_BEGIN: usize = 0;
 const HEADER_VERSION_BEGIN: usize = 2;
