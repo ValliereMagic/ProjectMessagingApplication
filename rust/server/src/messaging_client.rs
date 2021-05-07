@@ -18,10 +18,10 @@ impl MessagingClient {
 		}
 	}
 
-	fn send_error_message(&self, message: &str) {
+	fn send_error_message(&self, message: &str, header: &mut MessageHeader) {
 		// Populate the header for error messages
-		let mut header = MessageHeader::new();
 		header
+			.clear()
 			.set_message_type(MessageTypes::ERROR as u8)
 			.set_version_num(VERSION)
 			.set_source_username("server")
@@ -34,16 +34,16 @@ impl MessagingClient {
 			.send_to_client(&self.our_username, &(header, None));
 	}
 
-	pub fn client(&self) {
+	pub fn client(&self, mut client_header: MessageHeader) {
 		println!(
 			"Starting Receiving thread for client: {}",
 			self.our_username
 		);
 		// Send out login join message
 		let login_message = format!("User: {} entered the room.", self.our_username);
-		let mut client_header = MessageHeader::new();
 		// Set up the header
 		client_header
+			.clear()
 			.set_message_type(MessageTypes::MESSAGE as u8)
 			.set_version_num(VERSION)
 			.set_source_username("server")
@@ -55,7 +55,7 @@ impl MessagingClient {
 		// Send it out
 		self.other_clients_handle.send_to_all(
 			&self.our_username,
-			&(client_header, Some(Vec::from(login_message))),
+			&(&client_header, Some(Vec::from(login_message))),
 		);
 		// Handle the incoming messages
 		for message_res in &self.client_fd {

@@ -2,6 +2,7 @@ use crate::message_header::MessageHeader;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 pub type Message = (MessageHeader, Option<Vec<u8>>);
+pub type MessageRef<'a> = (&'a MessageHeader, Option<Vec<u8>>);
 
 pub struct MessageLayer {
 	client: TcpStream,
@@ -53,7 +54,7 @@ impl MessageLayer {
 		return Ok((header, message_body));
 	}
 	// Write a message to the FD
-	pub fn write_basic_message(&self, message: &Message) -> std::io::Result<usize> {
+	pub fn write_basic_message(&self, message: &MessageRef) -> std::io::Result<usize> {
 		// Write out the header
 		(&mut (&self.client)).write(&message.0 .0[..])?;
 		// Write out the body if it exists.

@@ -1,5 +1,5 @@
 use crate::messaging_client::MessagingClient;
-use message_layer::application_layer::Message;
+use message_layer::application_layer::MessageRef;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::RwLock;
@@ -26,7 +26,7 @@ impl SharedClients {
 		}
 	}
 	// Send a message to a specific client, represented by their username (dest_username)
-	pub fn send_to_client(&'static self, dest_username: &str, message: &Message) -> bool {
+	pub fn send_to_client(&'static self, dest_username: &str, message: &MessageRef) -> bool {
 		// unlock RwLock for reading
 		let unlocked_clients = self.clients.read().unwrap();
 		// Find the user in the clients Map
@@ -48,7 +48,7 @@ impl SharedClients {
 		}
 	}
 	// Send the passed message to all logged clients except ourselves
-	pub fn send_to_all(&'static self, source_username: &str, message: &Message) -> bool {
+	pub fn send_to_all(&'static self, source_username: &str, message: &MessageRef) -> bool {
 		let unlocked_clients = self.clients.read().unwrap();
 		// Send the message to all other clients
 		for (username, client) in unlocked_clients.iter() {
