@@ -67,6 +67,7 @@ fn login(client: TcpStream) {
 			// Send the login failure message and return.
 			let response_message = "Error. Username already in the system.";
 			login_response
+				.clear()
 				.set_message_type(MessageTypes::ERROR as u8)
 				.set_version_num(VERSION)
 				.set_source_username("server")
@@ -77,7 +78,7 @@ fn login(client: TcpStream) {
 				.calculate_header_checksum();
 			client_ret
 				.get_client_fd()
-				.write_basic_message(&(login_response, Some(Vec::from(response_message))))
+				.write_basic_message(&(&login_response, Some(Vec::from(response_message))))
 				.unwrap();
 			return;
 		}
@@ -85,10 +86,10 @@ fn login(client: TcpStream) {
 	// Send out the login success message
 	client_ptr
 		.get_client_fd()
-		.write_basic_message(&(login_response, None))
+		.write_basic_message(&(&login_response, None))
 		.unwrap();
 	// Start the receiving method
-	client_ptr.client();
+	client_ptr.client(login_response);
 	// Logout
 	sc.remove_user(&username);
 }

@@ -116,6 +116,14 @@ impl MessageHeader {
 	pub fn new() -> MessageHeader {
 		MessageHeader { 0: [0u8; 166] }
 	}
+	// Clear out the header of whatever is in it
+	pub fn clear(&mut self) -> &mut Self {
+		// Set everything to 0
+		for e in self.0.iter_mut() {
+			*e = 0
+		}
+		self
+	}
 	// Calculate the checksum of the entire header except for the checksum
 	// field at the end.
 	pub fn calculate_header_checksum(&mut self) {
