@@ -2,6 +2,7 @@ extern crate message_layer;
 use crate::shared_clients::SharedClients;
 use message_layer::application_layer::{Message, MessageLayer};
 use message_layer::message_header::{MessageHeader, MessageTypes, VERSION};
+use std::io::ErrorKind;
 
 pub struct MessagingClient {
 	client_fd: MessageLayer,
@@ -64,7 +65,11 @@ impl MessagingClient {
 				Ok(m) => message = m,
 				Err(s) => {
 					println!("Error: {}", s);
-					continue;
+					match s.kind() {
+						// Return on unexpected socket close
+						ErrorKind::UnexpectedEof => return,
+						_ => continue,
+					}
 				}
 			}
 			match MessageTypes::from_u8(message.0.get_message_type()) {
