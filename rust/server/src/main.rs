@@ -1,62 +1,96 @@
 extern crate message_layer;
-use message_layer::application_layer::MessageLayer;
-use message_layer::message_header::{MessageHeader, MessageTypes};
+mod messaging_client;
+mod shared_clients;
+use message_layer::application_layer::{Message, MessageLayer};
+use message_layer::message_header::{MessageHeader, MessageTypes, VERSION};
+use messaging_client::MessagingClient;
+use shared_clients::SharedClients;
 use std::net::{TcpListener, TcpStream};
+use std::rc::Rc;
 use std::thread;
 
 fn login(client: TcpStream) {
 	let app_layer = MessageLayer::new(client);
-	// Iterate through the messages being sent to us from the client.
-	for message in &app_layer {
-		// message is a Result, if Ok then it is a tuple of (header, data
-		// portion). If it is an Err, then its a String containing an error.
-		match message {
-			// For now, lets print out all the information about the messages we
-			// are receiving.
-			Ok(m) => {
-				// Example message type conversion
-				let _: MessageTypes = MessageTypes::from_u8(1);
-				// Example message write
-				let mut message_to_send = (MessageHeader::new(), None);
-				message_to_send.0.set_message_type(MessageTypes::WHO as u8);
-				app_layer.write_basic_message(&message_to_send).unwrap();
-				// Pull out message information
-				println!("Message Information:");
-				println!("Packet Number: {}", m.0.get_packet_num());
-				println!("Version Number: {}", m.0.get_version_num());
-				let username = match m.0.get_source_username() {
-					Ok(m) => m,
-					Err(_) => String::from("None"),
-				};
-				println!("Source Username: {}", username);
-				let username = match m.0.get_dest_username() {
-					Ok(m) => m,
-					Err(_) => String::from("None"),
-				};
-				println!("Dest username: {}", username);
-				println!("Message Type: {}", m.0.get_message_type());
+	// Pull the first message from the client, which is hopefully a login
+	// message.
+	let message: Message;
+	match app_layer.read_basic_message() {
+		Ok(m) => {
+			// Make sure this is a login request message
+			if m.0.get_message_type() != MessageTypes::LOGIN as u8 {
 				println!(
-					"Message data packet length: {}",
-					m.0.get_data_packet_length()
+					"{}{}",
+					"Error. First message is not a login request.", " Closing connection."
 				);
-				println!("Sent message if it exists:");
-				match m.1 {
-					Some(message) => {
-						for byte in message {
-							print!("{:x}:", byte);
-						}
-						println!();
-					}
-					None => (),
-				}
+				return;
 			}
-			Err(e) => {
-				println!("An error occurred reading the message!: {}", e);
-				break;
-			}
+			message = m;
+		}
+		Err(err) => {
+			println!("Error: {}", err);
+			return;
 		}
 	}
-	println!("Done with this connection.");
+	// Pull the source username string, and make sure we were
+	// successful.
+	let username: String;
+	match message.0.get_source_username() {
+		Ok(user) => {
+			username = user;
+		}
+		Err(err) => {
+			println!("Error: {}", err);
+			return;
+		}
+	}
+	// Create the login response message
+	let mut login_response = MessageHeader::new();
+	login_response
+		.set_version_num(VERSION)
+		.set_message_type(MessageTypes::LOGIN as u8)
+		.set_source_username("server")
+		.unwrap()
+		.set_dest_username(&username)
+		.unwrap()
+		.calculate_header_checksum();
+	// Create our MessagingClient
+	let client = MessagingClient::new(app_layer, &username);
+	// Get an instance of SharedClients
+	let sc = SharedClients::get_instance();
+	// Add our new user to the SharedClients
+	let client_ptr: Rc<MessagingClient>;
+	match sc.add_user(&username, client) {
+		// We logged in successfully
+		Ok(c) => client_ptr = c,
+		// We failed to login (duplicate username)
+		Err(client_ret) => {
+			// Send the login failure message and return.
+			let response_message = "Error. Username already in the system.";
+			login_response
+				.set_message_type(MessageTypes::ERROR as u8)
+				.set_version_num(VERSION)
+				.set_source_username("server")
+				.unwrap()
+				.set_dest_username(&username)
+				.unwrap()
+				.set_data_packet_length(response_message.len() as u16)
+				.calculate_header_checksum();
+			client_ret
+				.get_client_fd()
+				.write_basic_message(&(login_response, Some(Vec::from(response_message))))
+				.unwrap();
+			return;
+		}
+	}
+	// Send out the login success message
+	client_ptr
+		.get_client_fd()
+		.write_basic_message(&(login_response, None))
+		.unwrap();
+	// Start the receiving method
+	client_ptr.client();
+	// Logout
+	sc.remove_user(&username);
 }
 
 fn main() -> std::io::Result<()> {

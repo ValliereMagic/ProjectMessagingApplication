@@ -1,7 +1,7 @@
 use crate::message_header::MessageHeader;
 use std::io::{Read, Write};
 use std::net::TcpStream;
-type Message = (MessageHeader, Option<Vec<u8>>);
+pub type Message = (MessageHeader, Option<Vec<u8>>);
 
 pub struct MessageLayer {
 	client: TcpStream,
