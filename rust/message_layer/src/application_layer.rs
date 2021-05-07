@@ -1,5 +1,5 @@
 use crate::message_header::MessageHeader;
-use std::io::{Read, Write};
+use std::io::{Error, ErrorKind, Read, Result, Write};
 use std::net::TcpStream;
 pub type Message = (MessageHeader, Option<Vec<u8>>);
 pub type MessageRef<'a> = (&'a MessageHeader, Option<Vec<u8>>);
@@ -16,19 +16,14 @@ impl MessageLayer {
 		MessageLayer { client: client_fd }
 	}
 	// Read a message from the client FD
-	pub fn read_basic_message(&self) -> Result<Message, String> {
+	pub fn read_basic_message(&self) -> Result<Message> {
 		// Read in the message header from the FD
 		let mut header = MessageHeader::new();
 		// Try to read a header from the FD
-		match (&mut (&self.client)).read_exact(&mut header.0[..]) {
-			Ok(_) => (),
-			Err(err) => {
-				return Err(format!("{}", err));
-			}
-		}
+		(&mut (&self.client)).read_exact(&mut header.0[..])?;
 		// Make sure the header checksum is valid.
 		if !header.verify_header_checksum() {
-			return Err(format!("Error. Invalid header checksum."));
+			return Err(Error::new(ErrorKind::Other, "Invalid header checksum."));
 		}
 		// If the message has a body, read it in
 		let mut message_body: Option<Vec<u8>> = None;
@@ -43,12 +38,7 @@ impl MessageLayer {
 			}
 			// Read in the body initializing the vector.
 			// Make sure we were able to read it in correctly.
-			match (&mut (&self.client)).read_exact(&mut body_vec[..]) {
-				Ok(_) => (),
-				Err(err) => {
-					return Err(format!("{}", err));
-				}
-			}
+			(&mut (&self.client)).read_exact(&mut body_vec[..])?;
 			message_body = Some(body_vec);
 		}
 		return Ok((header, message_body));
@@ -68,7 +58,7 @@ impl MessageLayer {
 // Create an iterator allowing for looping over the messages from app_layer
 // as they come in.
 impl Iterator for &MessageLayer {
-	type Item = Result<Message, String>;
+	type Item = Result<Message>;
 
 	fn next(&mut self) -> Option<Self::Item> {
 		Some(self.read_basic_message())
