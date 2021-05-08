@@ -56,7 +56,7 @@ impl MessagingClient {
 		// Send it out
 		self.other_clients_handle.send_to_all(
 			&self.our_username,
-			&(&client_header, Some(Vec::from(login_message))),
+			&(&client_header, Some(login_message.as_bytes())),
 		);
 		// Handle the incoming messages
 		loop {
@@ -93,7 +93,7 @@ impl MessagingClient {
 					// Send off the message
 					self.other_clients_handle.send_to_client(
 						&self.our_username,
-						&(&client_header, Some(Vec::from(usernames))),
+						&(&client_header, Some(usernames.as_bytes())),
 					);
 				}
 				MessageTypes::ACK => (),
