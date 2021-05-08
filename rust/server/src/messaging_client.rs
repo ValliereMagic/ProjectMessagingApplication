@@ -59,7 +59,8 @@ impl MessagingClient {
 			&(&client_header, Some(Vec::from(login_message))),
 		);
 		// Handle the incoming messages
-		for message_res in &self.client_fd {
+		loop {
+			let message_res = self.client_fd.read_basic_message(& mut client_header);
 			let message: Message;
 			match message_res {
 				Ok(m) => message = m,
