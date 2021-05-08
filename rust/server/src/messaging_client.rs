@@ -60,7 +60,7 @@ impl MessagingClient {
 		);
 		// Handle the incoming messages
 		loop {
-			let message_res = self.client_fd.read_basic_message(& mut client_header);
+			let message_res = self.client_fd.read_basic_message(&mut client_header);
 			let message: Message;
 			match message_res {
 				Ok(m) => message = m,
@@ -76,7 +76,26 @@ impl MessagingClient {
 			match MessageTypes::from_u8(message.0.get_message_type()) {
 				MessageTypes::LOGIN => (),
 				MessageTypes::ERROR => (),
-				MessageTypes::WHO => (),
+				MessageTypes::WHO => {
+					// Retrieve the string of logged in users
+					let usernames = self.other_clients_handle.get_logged_in_users();
+					// Setup the header
+					client_header
+						.clear()
+						.set_message_type(MessageTypes::WHO as u8)
+						.set_version_num(3)
+						.set_source_username("server")
+						.unwrap()
+						.set_dest_username(&self.our_username)
+						.unwrap()
+						.set_data_packet_length(usernames.len() as u16)
+						.calculate_header_checksum();
+					// Send off the message
+					self.other_clients_handle.send_to_client(
+						&self.our_username,
+						&(&client_header, Some(Vec::from(usernames))),
+					);
+				}
 				MessageTypes::ACK => (),
 				MessageTypes::MESSAGE => (),
 				MessageTypes::DISCONNECT => (),
