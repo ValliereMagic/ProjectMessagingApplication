@@ -79,7 +79,7 @@ fn login(client: TcpStream) {
 				.calculate_header_checksum();
 			client_ret
 				.get_client_fd()
-				.write_basic_message(&(&header, Some(Vec::from(response_message))))
+				.write_basic_message(&(&header, Some(response_message.as_bytes())))
 				.unwrap();
 			return;
 		}
