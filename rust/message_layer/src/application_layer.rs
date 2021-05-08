@@ -1,8 +1,7 @@
 use crate::message_header::MessageHeader;
 use std::io::{Error, ErrorKind, Read, Result, Write};
 use std::net::TcpStream;
-pub type Message = (MessageHeader, Option<Vec<u8>>);
-pub type MessageRef<'a> = (&'a MessageHeader, Option<Vec<u8>>);
+pub type Message<'h> = (&'h MessageHeader, Option<Vec<u8>>);
 
 pub struct MessageLayer {
 	client: TcpStream,
@@ -16,9 +15,7 @@ impl MessageLayer {
 		MessageLayer { client: client_fd }
 	}
 	// Read a message from the client FD
-	pub fn read_basic_message(&self) -> Result<Message> {
-		// Read in the message header from the FD
-		let mut header = MessageHeader::new();
+	pub fn read_basic_message<'h>(&self, header: &'h mut MessageHeader) -> Result<Message<'h>> {
 		// Try to read a header from the FD
 		(&mut (&self.client)).read_exact(&mut header.0[..])?;
 		// Make sure the header checksum is valid.
@@ -44,7 +41,7 @@ impl MessageLayer {
 		return Ok((header, message_body));
 	}
 	// Write a message to the FD
-	pub fn write_basic_message(&self, message: &MessageRef) -> std::io::Result<usize> {
+	pub fn write_basic_message(&self, message: &Message) -> std::io::Result<usize> {
 		// Write out the header
 		(&mut (&self.client)).write(&message.0 .0[..])?;
 		// Write out the body if it exists.
@@ -52,15 +49,5 @@ impl MessageLayer {
 			Some(message) => (&mut (&self.client)).write(&message[..]),
 			None => Ok(0),
 		}
-	}
-}
-
-// Create an iterator allowing for looping over the messages from app_layer
-// as they come in.
-impl Iterator for &MessageLayer {
-	type Item = Result<Message>;
-
-	fn next(&mut self) -> Option<Self::Item> {
-		Some(self.read_basic_message())
 	}
 }
