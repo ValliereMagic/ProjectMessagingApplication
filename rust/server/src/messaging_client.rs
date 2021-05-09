@@ -35,6 +35,26 @@ impl MessagingClient {
 			.send_to_client(&self.our_username, &(header, None));
 	}
 
+	fn send_verification_message(
+		&self,
+		message_type: MessageTypes,
+		packet_num: u16,
+		header: &mut MessageHeader,
+	) {
+		header
+			.clear()
+			.set_message_type(message_type as u8)
+			.set_version_num(VERSION)
+			.set_packet_num(packet_num)
+			.set_source_username("server")
+			.unwrap()
+			.set_dest_username(&self.our_username)
+			.unwrap()
+			.calculate_header_checksum();
+		self.other_clients_handle
+			.send_to_client(&self.our_username, &(&header, None));
+	}
+
 	pub fn client(&self, mut client_header: MessageHeader) {
 		println!(
 			"Starting Receiving thread for client: {}",
@@ -73,8 +93,11 @@ impl MessagingClient {
 					}
 				}
 			}
+			// Handle the message based on what type it is.
 			match MessageTypes::from_u8(message.0.get_message_type()) {
-				MessageTypes::LOGIN => (),
+				MessageTypes::LOGIN => {
+					self.send_error_message("You're already logged in dingus.", &mut client_header);
+				}
 				MessageTypes::ERROR => (),
 				MessageTypes::WHO => {
 					// Retrieve the string of logged in users
@@ -97,11 +120,81 @@ impl MessagingClient {
 					);
 				}
 				MessageTypes::ACK => (),
-				MessageTypes::MESSAGE => (),
-				MessageTypes::DISCONNECT => (),
+				MessageTypes::MESSAGE => {
+					// If there is no message from this header, no point in
+					// forwarding it
+					if !message.1.is_some() {
+						// Send back an error message to the client.
+						self.send_error_message(
+							&format!(
+								"{}{}",
+								"The message you sent contains no content. ",
+								"It will not be forwarded."
+							),
+							&mut client_header,
+						);
+						continue;
+					}
+					// Verify the integrity of the message contents. We already
+					// checked whether it is there, so unwrap it.
+					// Cannot use client_header in here as it has been already
+					// mutable borrowed. Therefore, we are accessing it through
+					// message instead
+					{
+						let mut verification_header = MessageHeader::new();
+						if !(message.0.verify_data_checksum(&message.1.as_ref().unwrap())) {
+							self.send_verification_message(
+								MessageTypes::NACK,
+								client_header.get_packet_num(),
+								&mut verification_header,
+							);
+							continue;
+						}
+						self.send_verification_message(
+							MessageTypes::ACK,
+							message.0.get_packet_num(),
+							&mut verification_header,
+						);
+					}
+					// Either broadcast the message, or forward it to a specific
+					// user
+					let dest_username = message.0.get_dest_username().unwrap();
+					if dest_username == "all" {
+						self.other_clients_handle.send_to_all(
+							&self.our_username,
+							&(&message.0, Some(&message.1.as_ref().unwrap()[..])),
+						);
+					} else {
+						self.other_clients_handle.send_to_client(
+							&dest_username,
+							&(&message.0, Some(&message.1.unwrap()[..])),
+						);
+					}
+				}
+				MessageTypes::DISCONNECT => {
+					let leave_message =
+						format!("User: {} disconnected from the room.", self.our_username);
+					// Setup the header information
+					client_header
+						.clear()
+						.set_message_type(MessageTypes::MESSAGE as u8)
+						.set_version_num(VERSION)
+						.set_source_username("server")
+						.unwrap()
+						.set_dest_username("all")
+						.unwrap()
+						.set_data_packet_length(leave_message.len() as u16)
+						.calculate_header_checksum();
+					// Send it out
+					self.other_clients_handle.send_to_all(
+						&self.our_username,
+						&(&client_header, Some(leave_message.as_bytes())),
+					);
+					// return, as we are done with this connection now.
+					return;
+				}
 				MessageTypes::NACK => (),
 			}
-			println!("Message Received.");
 		}
 	}
 	// Return an immutable reference to this MessageClient so others can send us
