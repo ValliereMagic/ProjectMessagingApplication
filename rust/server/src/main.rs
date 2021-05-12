@@ -15,7 +15,7 @@ fn login(client: TcpStream) {
 	// message.
 	let mut header = MessageHeader::new();
 	let message: Message;
-	match app_layer.read_basic_message(&mut header) {
+	match app_layer.read_basic_message() {
 		Ok(m) => {
 			// Make sure this is a login request message
 			if m.0.get_message_type() != MessageTypes::LOGIN as u8 {
