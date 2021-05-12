@@ -79,8 +79,7 @@ impl MessagingClient {
 			&(&client_header, Some(login_message.as_bytes())),
 		);
 		// Handle the incoming messages
-		loop {
-			let message_res = self.client_fd.read_basic_message(&mut client_header);
+		for message_res in &self.client_fd {
 			let message: Message;
 			match message_res {
 				Ok(m) => message = m,
