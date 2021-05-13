@@ -17,13 +17,17 @@ fn login(client: TcpStream) {
 	let message: Message;
 	match app_layer.read_basic_message() {
 		Ok(m) => {
-			// Make sure this is a login request message
-			if m.0.get_message_type() != MessageTypes::LOGIN as u8 {
-				println!(
-					"{}{}",
-					"Error. First message is not a login request.", " Closing connection."
-				);
-				return;
+			// Header borrow scope
+			{
+				let r_header = m.0.borrow();
+				// Make sure this is a login request message
+				if r_header.get_message_type() != MessageTypes::LOGIN as u8 {
+					println!(
+						"{}{}",
+						"Error. First message is not a login request.", " Closing connection."
+					);
+					return;
+				}
 			}
 			message = m;
 		}
@@ -35,7 +39,7 @@ fn login(client: TcpStream) {
 	// Pull the source username string, and make sure we were
 	// successful.
 	let username: String;
-	match message.0.get_source_username() {
+	match message.0.borrow().get_source_username() {
 		Ok(user) => {
 			username = user;
 		}
