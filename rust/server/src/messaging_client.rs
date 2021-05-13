@@ -92,8 +92,10 @@ impl MessagingClient {
 					}
 				}
 			}
+			// Borrow the message header
+			let header = message.0.borrow();
 			// Handle the message based on what type it is.
-			match MessageTypes::from_u8(message.0.get_message_type()) {
+			match MessageTypes::from_u8(header.get_message_type()) {
 				MessageTypes::LOGIN => {
 					self.send_error_message("You're already logged in dingus.", &mut client_header);
 				}
@@ -134,6 +136,8 @@ impl MessagingClient {
 						);
 						continue;
 					}
+					// Borrow the message body
+					let body = message.1.as_ref().unwrap().borrow();
 					// Verify the integrity of the message contents. We already
 					// checked whether it is there, so unwrap it.
 					// Cannot use client_header in here as it has been already
@@ -141,7 +145,7 @@ impl MessagingClient {
 					// message instead
 					{
 						let mut verification_header = MessageHeader::new();
-						if !(message.0.verify_data_checksum(&message.1.as_ref().unwrap())) {
+						if !(header.verify_data_checksum(&body)) {
 							self.send_verification_message(
 								MessageTypes::NACK,
 								client_header.get_packet_num(),
@@ -151,23 +155,19 @@ impl MessagingClient {
 						}
 						self.send_verification_message(
 							MessageTypes::ACK,
-							message.0.get_packet_num(),
+							header.get_packet_num(),
 							&mut verification_header,
 						);
 					}
 					// Either broadcast the message, or forward it to a specific
 					// user
-					let dest_username = message.0.get_dest_username().unwrap();
+					let dest_username = header.get_dest_username().unwrap();
 					if dest_username == "all" {
-						self.other_clients_handle.send_to_all(
-							&self.our_username,
-							&(&message.0, Some(&message.1.as_ref().unwrap()[..])),
-						);
+						self.other_clients_handle
+							.send_to_all(&self.our_username, &(&header, Some(&body[..])));
 					} else {
-						self.other_clients_handle.send_to_client(
-							&dest_username,
-							&(&message.0, Some(&message.1.unwrap()[..])),
-						);
+						self.other_clients_handle
+							.send_to_client(&dest_username, &(&header, Some(&body[..])));
 					}
 				}
 				MessageTypes::DISCONNECT => {
