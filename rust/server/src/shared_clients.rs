@@ -30,9 +30,8 @@ impl SharedClients {
 		// unlock RwLock for reading
 		let unlocked_clients = self.clients.read().unwrap();
 		// Find the user in the clients Map
-		let user: &MessagingClient;
-		match unlocked_clients.get(dest_username) {
-			Some(u) => user = u,
+		let user: &MessagingClient = match unlocked_clients.get(dest_username) {
+			Some(u) => u,
 			None => return false,
 		};
 		// Send them the message.

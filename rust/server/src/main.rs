@@ -14,8 +14,7 @@ fn login(client: TcpStream) {
 	// Pull the first message from the client, which is hopefully a login
 	// message.
 	let mut header = MessageHeader::new();
-	let message: Message;
-	match app_layer.read_basic_message() {
+	let message: Message = match app_layer.read_basic_message() {
 		Ok(m) => {
 			// Header borrow scope
 			{
@@ -29,25 +28,22 @@ fn login(client: TcpStream) {
 					return;
 				}
 			}
-			message = m;
+			m
 		}
 		Err(err) => {
 			println!("Error: {}", err);
 			return;
 		}
-	}
+	};
 	// Pull the source username string, and make sure we were
 	// successful.
-	let username: String;
-	match message.0.borrow().get_source_username() {
-		Ok(user) => {
-			username = user;
-		}
+	let username: String = match message.0.borrow().get_source_username() {
+		Ok(user) => user,
 		Err(err) => {
 			println!("Error: {}", err);
 			return;
 		}
-	}
+	};
 	// Create the login response message
 	header
 		.clear()
@@ -63,10 +59,9 @@ fn login(client: TcpStream) {
 	// Get an instance of SharedClients
 	let sc = SharedClients::get_instance();
 	// Add our new user to the SharedClients
-	let client_ptr: Rc<MessagingClient>;
-	match sc.add_user(&username, client) {
+	let client_ptr: Rc<MessagingClient> = match sc.add_user(&username, client) {
 		// We logged in successfully
-		Ok(c) => client_ptr = c,
+		Ok(c) => c,
 		// We failed to login (duplicate username)
 		Err(client_ret) => {
 			// Send the login failure message and return.
@@ -87,7 +82,7 @@ fn login(client: TcpStream) {
 				.unwrap();
 			return;
 		}
-	}
+	};
 	// Send out the login success message
 	client_ptr
 		.get_client_fd()
