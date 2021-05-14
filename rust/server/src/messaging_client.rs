@@ -80,9 +80,8 @@ impl MessagingClient {
 		);
 		// Handle the incoming messages
 		for message_res in &self.client_fd {
-			let message: Message;
-			match message_res {
-				Ok(m) => message = m,
+			let message: Message = match message_res {
+				Ok(m) => m,
 				Err(s) => {
 					println!("Error: {}", s);
 					match s.kind() {
@@ -91,7 +90,7 @@ impl MessagingClient {
 						_ => continue,
 					}
 				}
-			}
+			};
 			// Borrow the message header
 			let header = message.0.borrow();
 			// Handle the message based on what type it is.
